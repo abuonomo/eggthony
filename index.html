@@ -999,6 +999,7 @@ let transitionTimer = 0;
 let gameOverCooldown = 0;
 let gameOverPhase = 'waiting'; // waiting, input, submitted, showing
 let titleBlink = 0;
+let snotReadyFlash = 0;
 
 // Name overlay elements & handlers
 const nameOverlay = document.getElementById('nameOverlay');
@@ -2333,7 +2334,11 @@ function updatePlayer(dt) {
   player.metalTimer = Math.max(0, player.metalTimer - dt);
   player.muscleTimer = Math.max(0, player.muscleTimer - dt);
   player.slamCooldown = Math.max(0, player.slamCooldown - dt);
+  const prevSnotCooldown = player.snotCooldown;
   player.snotCooldown = Math.max(0, player.snotCooldown - dt);
+  if (prevSnotCooldown > 0 && player.snotCooldown <= 0) {
+    snotReadyFlash = 2.0; // show "SNOT READY" for 2 seconds
+  }
   const prevWingsTimer = player.wingsTimer;
   player.wingsTimer = Math.max(0, player.wingsTimer - dt);
   player.poopCooldown = Math.max(0, player.poopCooldown - dt);
@@ -2519,6 +2524,7 @@ function drawPlayer() {
       ctx.fillRect(drawX, drawY, drawW, drawH);
     }
     ctx.restore();
+
   } else {
     // Fallback egg shape
     ctx.fillStyle = player.flashTimer > 0 ? '#fff' : '#f5e6c8';
@@ -2529,6 +2535,22 @@ function drawPlayer() {
     const eyeOff = player.facingRight ? 5 : -5;
     ctx.fillRect(cx + eyeOff - 3, cy - 10, 3, 4);
     ctx.fillRect(cx + eyeOff + 5, cy - 10, 3, 4);
+  }
+
+  // "SNOT READY" flash above head
+  if (snotReadyFlash > 0) {
+    snotReadyFlash -= 1 / 60;
+    const alpha = snotReadyFlash > 1.5 ? (2.0 - snotReadyFlash) * 2 : Math.min(1, snotReadyFlash / 1.5);
+    const bob = Math.sin(performance.now() * 0.006) * 2;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillStyle = `rgba(170,255,50,${alpha})`;
+    ctx.shadowColor = '#aaff33';
+    ctx.shadowBlur = 6;
+    ctx.fillText('SNOT READY!', cx, py - 10 + bob);
+    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 
   ctx.restore();
