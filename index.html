@@ -2227,14 +2227,15 @@ function updatePlayer(dt) {
   } else {
     // Jump (SSBM-style double jump)
     const jumpInput = keys['w'] || keys['arrowup'] || keys[' '];
+    const jumpMult = player.muscleTimer > 0 ? 1.5 : 1;
     if (jumpInput && !player.jumpHeld) {
       if (player.onGround) {
-        // Grounded jump — full force
-        player.vy = JUMP_FORCE;
+        // Grounded jump — full force (super jump in muscle mode)
+        player.vy = JUMP_FORCE * jumpMult;
         player.onGround = false;
       } else if (player.airJumps > 0) {
         // Aerial double jump — slightly weaker, resets vertical momentum
-        player.vy = JUMP_FORCE * 0.85;
+        player.vy = JUMP_FORCE * 0.85 * jumpMult;
         player.airJumps--;
       }
     }
