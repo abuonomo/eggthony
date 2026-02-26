@@ -1,16 +1,17 @@
 # CLAUDE.md
 
 ## Project Overview
-Eggthony: Lightning Egg — single-file HTML5 Canvas arena brawler. All game code lives in `index.html` (~3700 lines of JS). No frameworks, no build step, no dependencies.
+Eggthony: Lightning Egg — HTML5 Canvas arena brawler built with ES6 modules and Vite.
 
 ## Architecture
-- **Single file:** `index.html` contains all HTML, CSS, and JavaScript
+- **Build:** Vite dev server + production bundler (`npm run dev` / `npm run build`)
 - **Resolution:** 480x854 (portrait), fixed 60 FPS timestep via accumulator
 - **Rendering:** Canvas 2D with pixelated upscaling
-- **Audio:** Web Audio API procedural SFX (`playSound()` switch) + M4A voice clips in `data/sounds/`
-- **Sprites:** PNG files in `data/`, loaded via `Image()` objects
+- **Audio:** Web Audio API procedural SFX (`playSound()` switch) + M4A voice clips in `public/data/sounds/`
+- **Sprites:** PNG files in `public/data/`, loaded via `Image()` objects
+- **State:** Single shared `S` object in `state.js` — all modules import `S` and read/write directly
 
-## Key Constants & Layout (index.html)
+## Key Constants & Layout
 - Game area: W=480, H=854
 - Main platform: PLATFORM_Y=520, PLATFORM_X=20, PLATFORM_W=440, PLATFORM_H=24
 - Player: 56x128, speed 260, jump -560, gravity 1400, 100 HP
@@ -21,51 +22,50 @@ Eggthony: Lightning Egg — single-file HTML5 Canvas arena brawler. All game cod
 - QP Boss (app >= 3): size resets to 1.0, scale growth 0.15/app, dmg capped at 30, charge 320 base
 - Fart cloud: 130px radius, 4s duration, 12 DPS (0.5s tick)
 
-## Code Organization (top to bottom)
-1. Canvas setup & sizing (~1-60)
-2. Audio engine & playSound switch (~64-210)
-3. Voice clips (~216-256)
-4. Sprite loading (~258-280)
-5. Input handling — keyboard, mouse, touch (~282-630)
-6. Game constants (~638-680)
-7. Floating platform constants & slots (~651-680)
-8. Theme definitions (3 themes) (~680-730)
-9. Game state variables (~730-760)
-10. Boss creation & update (~800-1200)
-11. Boss drawing (~1200-1400)
-12. Background & ambient drawing (~1400-1580)
-13. Main platform drawing + floating platform drawing (~1580-1810)
-14. Particles & damage numbers (~1810-1880)
-15. Player creation, update, drawing (~1880-2120)
-16. Snot rocket system (~2120-2500)
-17. Floating platform update (~2380-2440)
-18. Enemy system (~2600-2820)
-19. Powerups — metal hat & smoothie (~2820-3100)
-20. Wave/round system (~3100-3170)
-21. HUD drawing (~3170-3420)
-22. Title/transition/gameover screens (~3420-3530)
-23. Click handlers (game state resets) (~3530-3600)
-24. Main game loop, update(), draw() (~3600-3760)
+## Code Organization (src/ modules)
+
+| File | Lines | Purpose |
+|------|-------|---------|
+| `main.js` | ~270 | Entry point: canvas setup, resize, game loop, update/draw orchestration, click handlers |
+| `state.js` | ~210 | Single exported `S` object with ALL mutable game state, `resetPlayer()`, `resetGameState()` |
+| `constants.js` | ~210 | All const values: dimensions, physics, durations, THEMES array |
+| `audio.js` | ~290 | audioCtx, playSound (20 types), playNoise, playVoice, all Audio clips |
+| `sprites.js` | ~115 | All Image() loading, removeWhiteBG, flash canvas |
+| `input.js` | ~430 | Keyboard/mouse/touch handlers, autoAimMouse, drawTouchHUD |
+| `player.js` | ~380 | updatePlayer, drawPlayer |
+| `boss.js` | ~760 | createBoss, updateBoss, damageBoss, drawBoss, fart clouds |
+| `enemies.js` | ~530 | spawn, update, draw, damageEnemy, enemy projectiles |
+| `weapons.js` | ~710 | Lightning, snot rocket, poop bombs, snot storm overlay |
+| `powerups.js` | ~910 | Metal hat, smoothie, wings, chestplate+dwyer |
+| `effects.js` | ~220 | Particles, damage numbers, screen shake, camp spider |
+| `world.js` | ~650 | Themes, ambient particles, backgrounds, platforms |
+| `waves.js` | ~80 | startRound, updateWaves, round progression |
+| `screens.js` | ~650 | Title, transition, gameOver, HUD, dev menu, leaderboard |
+| `utils.js` | ~5 | rectsOverlap |
 
 ## Important Patterns
-- **Themes:** `getTheme()` returns current theme object with colors, decorStyle, ambientType. All drawing functions read from theme.
-- **Player collision:** Main platform first, then floating platforms (one-way, drop-through with S/Down). Enemies/boss only use PLATFORM_Y.
+- **Shared state:** All modules import `S` from `state.js`. `S.ctx`, `S.player`, `S.enemies`, etc.
+- **Draw functions:** Use `const ctx = S.ctx;` at the top for convenience.
+- **Themes:** `getTheme()` returns current theme object with colors, decorStyle, ambientType.
+- **Player collision:** Main platform first, then floating platforms (one-way, drop-through with S/Down).
 - **Powerup modes:** `player.metalTimer > 0` = metal mode, `player.muscleTimer > 0` = muscle mode. Both can overlap.
 - **Boss phases:** idle → charge or pound_jump → pound_land → shockwave → idle. Rage at ≤30% HP. QP also has fart_windup → fart_release.
-- **QP boss:** `boss.isQuentinPizza` flag. Uses `qpApp` (app - 2) for size/damage scaling so first QP appearance starts at base size. Immediately farts on entering.
-- **Dev menu:** Hidden on title screen. `devMenuOpen`, `devTapCount`, `devTapTimer` state vars. Tap top-left 80x80 zone 5x to open. Mobile touch handled directly in touchstart (not via click event). On round select, sets `currentThemeIndex = getThemeIndex(r)` before `startRound(r)`.
-- **Enemy types:** grunt (basic), spitter (ranged), brute (charging). Type determined at spawn by round-based probability.
-- **State resets:** Game restart clears state in TWO click handlers (title and gameOver) plus `startRound()`. All three must stay in sync.
+- **QP boss:** `boss.isQuentinPizza` flag. Uses `qpApp` (app - 2) for size/damage scaling.
+- **Dev menu:** Hidden on title screen. Tap top-left 80x80 zone 5x to open.
+- **Enemy types:** grunt (basic), spitter (ranged), brute (charging).
+- **State resets:** Consolidated into `resetGameState(round)` in `state.js`.
 
 ## Workspace & Repo Structure
 - The git repo is `eggthony/` — NOT the parent `eggthony-workspace/` directory
 - `eggthony-workspace/` is just a working directory that contains the repo and other workspace files (e.g. `.claude/`)
 - The only branch is `main`. Do not create or use `master`
 - All git commands (commit, push, etc.) should run inside `eggthony/`
+- Assets live in `public/data/` (served as `/data/` by Vite)
 
 ## Adding New Features
-- New sounds: add case to `playSound()` switch (~line 88)
-- New enemies: add to `spawnEnemyForRound()` and `updateEnemies()`/`drawEnemies()`
-- New powerups: follow metal hat / smoothie pattern (spawn timer, update, draw, player state)
-- New themes: add entry to THEMES array, implement decorStyle in `drawPlatform()`
-- State resets: update BOTH click handlers, dev menu round select handler, AND `startRound()` when adding persistent state
+- New sounds: add case to `playSound()` switch in `src/audio.js`
+- New enemies: add to `spawnEnemyForRound()` in `src/enemies.js`
+- New powerups: follow metal hat pattern in `src/powerups.js` (spawn timer, update, draw, player state)
+- New themes: add entry to THEMES array in `src/constants.js`, implement decorStyle in `src/world.js`
+- State resets: update `resetGameState()` in `src/state.js` when adding persistent state
+- New player abilities: add to `src/player.js` (update/draw) and `src/input.js` (controls)

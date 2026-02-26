@@ -1,14 +1,26 @@
 # Eggthony: Lightning Egg
 
-A fast-paced 2D arena brawler built entirely in a single HTML file. You play as Eggthony, a sentient egg armed with lightning bolts and booger mortars, fighting endless waves of increasingly dangerous enemies across three themed environments.
+A fast-paced 2D arena brawler built with HTML5 Canvas and ES6 modules. You play as Eggthony, a sentient egg armed with lightning bolts and booger mortars, fighting endless waves of increasingly dangerous enemies across three themed environments.
 
 Inspired by Super Smash Bros. Melee's platform combat and classic arcade wave survival games.
 
 ## Play
 
-Open `index.html` in any modern browser. No build step, no dependencies, no server required.
+### Development
+```
+npm install
+npm run dev
+```
+
+### Production
+```
+npm run build
+npm run preview
+```
 
 Works on desktop (keyboard + mouse) and mobile (touch controls auto-detected).
+
+**Live:** [eggthony.com](https://eggthony.com)
 
 ## Controls
 
@@ -17,8 +29,8 @@ Works on desktop (keyboard + mouse) and mobile (touch controls auto-detected).
 |-----|--------|
 | A / D | Move left / right |
 | W / Space | Jump (tap again mid-air for double jump) |
-| S / Down | Drop through floating platforms |
-| Left / Right Click | Shoot lightning toward cursor |
+| S / Down | Drop through floating platforms / fast-fall |
+| Left Click | Shoot lightning toward cursor |
 | Hold Q or E | Charge snot rocket mortar, release to fire |
 | Escape | Pause / unpause |
 
@@ -35,6 +47,12 @@ Works on desktop (keyboard + mouse) and mobile (touch controls auto-detected).
 **Lightning** - Your primary attack. Rapid-fire bolts aimed at the cursor (or auto-aimed on mobile). 15 damage per bolt, 0.12s cooldown. No resource cost.
 
 **Snot Rocket** - Hold Q/E to charge a booger mortar. A trajectory arc and AOE circle preview where it will land. On impact, freezes all enemies in a 120px radius for 3 seconds. 8 second cooldown. The longer you hold, the farther it flies (60-380px range).
+
+**Snot Stomp** - Land on frozen enemies to stomp them. Hold W/Up for a power stomp (120 dmg vs 60 dmg). Chain 3 stomps to activate Snot Storm mode.
+
+**Snot Storm** - Activated by 3 consecutive stomps. Lightning gains AOE splash damage, green visual effects, and enemies hit are briefly frozen. Lasts 8 seconds.
+
+**Poop Bombs** - Available during Wings mode. Click to drop bombs that deal AOE damage on impact.
 
 ### Enemies
 
@@ -62,11 +80,19 @@ Bosses appear every 3rd round (3, 6, 9...). Scales in HP, damage, speed, and siz
 
 ### Powerups
 
-**Metal Hat** (silver dome) - 7 seconds of damage reflection. Enemy contact bounces them away and deals 40 damage back. Deflects projectiles. Spawns every 15-25 seconds.
+**Metal Hat** (silver dome) - 7 seconds of damage reflection. Enemy contact bounces them away and deals 40 damage back. Deflects projectiles.
 
-**Blueberry Smoothie** (purple cup) - 6 seconds of muscle mode. Automatic AOE slam attacks hit nearby enemies for 30 damage with knockback. Spawns every 20-30 seconds.
+**Blueberry Smoothie** (purple cup) - 6 seconds of muscle mode. Automatic AOE slam attacks hit nearby enemies for 30 damage with knockback.
 
-Both powerups can be active simultaneously.
+**Wings** (golden wings) - 10 seconds of flight. Hover above the arena, drop poop bombs on enemies below.
+
+**Chestplate** (golden armor) - Summons Dwyer, a Roman soldier companion who fights alongside you with a sword for 15 seconds. Dramatic drop entrance with AOE damage.
+
+All powerups can be active simultaneously.
+
+### Anti-Camping: Spider
+
+Stay in one spot too long and a spider descends from the ceiling to grab you. Mash the attack button to escape. Escape near the top of the screen for Spider Drop mode: hang from the ceiling with 3x fire rate for 4 seconds.
 
 ### Floating Platforms
 
@@ -103,28 +129,39 @@ Transitions use a fade-to-black effect with theme announcement.
 - **Rendering:** HTML5 Canvas 2D, pixelated upscaling
 - **Frame rate:** Fixed 60 FPS with accumulator-based timestep
 - **Audio:** All SFX procedurally generated via Web Audio API oscillators. Voice clips are pre-recorded M4A files.
-- **Architecture:** Single-file (`index.html`, ~3700 lines). No frameworks, no build tools, no external dependencies.
+- **Build:** Vite for dev server and production bundling
 
 ### Dev Menu
 
-Hidden developer menu for testing: tap the top-left corner of the title screen 5 times quickly to open. Allows jumping directly to any round (1-15) with the correct theme loaded.
+Hidden developer menu for testing: tap the top-left corner of the title screen 5 times quickly to open. Allows jumping directly to any round (1-15) with the correct theme loaded. Includes powerup toggles and local dev leaderboard controls.
 
 ## Project Structure
 
 ```
 eggthony/
-  index.html          # Entire game (HTML + JS + CSS)
-  data/
-    eggthony.png      # Player sprite
-    metal_eggthony.png# Metal powerup variant
-    muscle_eggthony.png# Muscle powerup variant
-    evil_eggthony.png # Boss sprite (rounds 3, 6)
-    evil_eggthony_2.png # Boss sprite variant
-    quentin_pizza.png # QP boss sprite (rounds 9+)
-    grunt.PNG         # Grunt enemy sprite
-    brute.PNG         # Brute enemy sprite
-    spitter.PNG       # Spitter enemy sprite
-    metal_hat.PNG     # Metal hat powerup icon
-    smoothie.PNG      # Smoothie powerup icon
-    sounds/           # Voice clips and ambient audio (M4A)
+  index.html              # HTML shell (canvas + name input overlay)
+  package.json            # Vite dev dependency
+  vite.config.js          # Minimal Vite config
+  src/
+    main.js               # Entry: canvas setup, game loop, click handlers
+    state.js              # Shared mutable state (S object), reset functions
+    constants.js          # All constants, THEMES array
+    audio.js              # Web Audio SFX, voice clips, music
+    sprites.js            # Image loading, white-BG removal
+    input.js              # Keyboard, mouse, touch handlers
+    player.js             # Player physics and drawing
+    boss.js               # Boss AI, fart clouds
+    enemies.js            # Enemy spawn, AI, combat
+    weapons.js            # Lightning, snot rocket, poop bombs
+    powerups.js           # Metal hat, smoothie, wings, chestplate, dwyer
+    effects.js            # Particles, damage numbers, screen shake, camp spider
+    world.js              # Themes, backgrounds, platforms
+    waves.js              # Round/wave system
+    screens.js            # Title, HUD, game over, dev menu, leaderboard
+    utils.js              # Collision helper
+  public/
+    CNAME                 # Custom domain config
+    data/
+      *.png               # Sprites
+      sounds/             # Voice clips and music (M4A)
 ```
