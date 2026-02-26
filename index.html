@@ -9,15 +9,15 @@
 <!-- Open Graph (iMessage, Facebook, etc.) -->
 <meta property="og:title" content="Eggthony: Lightning Egg">
 <meta property="og:description" content="Arena brawler starring a lightning-wielding egg. Zap enemies, launch snot rockets, and fight bosses.">
-<meta property="og:image" content="https://eggthony.com/data/eggthony_banner.png">
+<meta property="og:image" content="https://eggthony.com/data/eggthony_banner.jpg">
 <meta property="og:url" content="https://eggthony.com">
 <meta property="og:type" content="website">
 
 <!-- Twitter/X -->
-<meta name="twitter:card" content="summary">
+<meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Eggthony: Lightning Egg">
 <meta name="twitter:description" content="Arena brawler starring a lightning-wielding egg. Zap enemies, launch snot rockets, and fight bosses.">
-<meta name="twitter:image" content="https://eggthony.com/data/eggthony_banner.png">
+<meta name="twitter:image" content="https://eggthony.com/data/eggthony_banner.jpg">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
@@ -223,6 +223,31 @@ function playSound(type) {
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
       osc.start(t); osc.stop(t + 0.2);
       break;
+    case 'poopDrop':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400, t);
+      osc.frequency.exponentialRampToValueAtTime(150, t + 0.2);
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      osc.start(t); osc.stop(t + 0.2);
+      break;
+    case 'poopSplat':
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(120, t);
+      osc.frequency.exponentialRampToValueAtTime(40, t + 0.25);
+      gain.gain.setValueAtTime(0.2, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      osc.start(t); osc.stop(t + 0.25);
+      break;
+    case 'wingsPickup':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(500, t);
+      osc.frequency.exponentialRampToValueAtTime(900, t + 0.15);
+      osc.frequency.exponentialRampToValueAtTime(1200, t + 0.3);
+      gain.gain.setValueAtTime(0.15, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc.start(t); osc.stop(t + 0.3);
+      break;
   }
 }
 
@@ -382,6 +407,18 @@ for (const [src, cb] of spriteFiles) {
   const raw = new Image();
   raw.onload = () => removeWhiteBG(raw, cb);
   raw.src = src;
+}
+
+const wingsSprite = new Image();
+wingsSprite.src = 'data/wings_eggthony.png';
+let wingsSpriteLoaded = false;
+wingsSprite.onload = () => { wingsSpriteLoaded = true; };
+
+let wingsPowerupSprite = null, wingsPowerupSpriteLoaded = false;
+{
+  const raw = new Image();
+  raw.onload = () => removeWhiteBG(raw, (s) => { wingsPowerupSprite = s; wingsPowerupSpriteLoaded = true; });
+  raw.src = 'data/wings_powerup.png';
 }
 
 // ============================================================
@@ -780,6 +817,16 @@ const LIGHTNING_SPEED = 700;
 const LIGHTNING_DAMAGE = 15;
 const LIGHTNING_COOLDOWN = 0.12;
 
+const WINGS_DURATION = 8;
+const WINGS_SIZE = 40;
+const WINGS_FLY_Y = 80;
+const WINGS_RISE_SPEED = 400;
+const POOP_DAMAGE = 22;
+const POOP_AOE_RADIUS = 90;
+const POOP_COOLDOWN = 0.45;
+const POOP_SIZE = 12;
+const POOP_GRAVITY = 800;
+
 const PLAYER_MAX_HP = 100;
 const IFRAME_DURATION = 0.8;
 const CONTACT_DAMAGE = 10;
@@ -1098,7 +1145,7 @@ function updateBoss(dt) {
         playNoise(0.25, 0.2);
 
         const shockDist = Math.abs(pcx - (boss.x + boss.w / 2));
-        if (shockDist < 120 && player.iframes <= 0) {
+        if (shockDist < 120 && player.iframes <= 0 && player.wingsTimer <= 0) {
           if (player.metalTimer > 0) {
             const knockDir = Math.sign(pcx - (boss.x + boss.w / 2));
             player.vx = knockDir * 400;
@@ -2018,7 +2065,9 @@ const player = {
   snotHolding: false,
   snotChargeTime: 0,
   airJumps: 1,
-  jumpHeld: false
+  jumpHeld: false,
+  wingsTimer: 0,
+  poopCooldown: 0
 };
 
 function resetPlayer() {
@@ -2039,6 +2088,8 @@ function resetPlayer() {
   player.snotChargeTime = 0;
   player.airJumps = 1;
   player.jumpHeld = false;
+  player.wingsTimer = 0;
+  player.poopCooldown = 0;
   lowHpTriggered = false;
 }
 
@@ -2049,65 +2100,84 @@ function updatePlayer(dt) {
   if (keys['d'] || keys['arrowright']) moveX += 1;
   player.vx = moveX * PLAYER_SPEED;
 
-  // Jump (SSBM-style double jump)
-  const jumpInput = keys['w'] || keys['arrowup'] || keys[' '];
-  if (jumpInput && !player.jumpHeld) {
-    if (player.onGround) {
-      // Grounded jump — full force
-      player.vy = JUMP_FORCE;
-      player.onGround = false;
-    } else if (player.airJumps > 0) {
-      // Aerial double jump — slightly weaker, resets vertical momentum
-      player.vy = JUMP_FORCE * 0.85;
-      player.airJumps--;
+  if (player.wingsTimer > 0) {
+    // Flying mode — rise to target height, gentle bob
+    const targetY = WINGS_FLY_Y;
+    if (player.y + PLAYER_H / 2 > targetY) {
+      player.vy = -WINGS_RISE_SPEED;
+      player.y += player.vy * dt;
+      if (player.y + PLAYER_H / 2 <= targetY) {
+        player.y = targetY - PLAYER_H / 2;
+        player.vy = 0;
+      }
+    } else {
+      // Gentle sine bob at target height
+      player.y = targetY - PLAYER_H / 2 + Math.sin(performance.now() * 0.003) * 4;
+      player.vy = 0;
     }
-  }
-  player.jumpHeld = jumpInput;
-
-  // Gravity
-  player.vy += GRAVITY * dt;
-
-  // Apply velocity
-  player.x += player.vx * dt;
-  player.y += player.vy * dt;
-
-  // Platform collision
-  const playerBottom = player.y + PLAYER_H;
-  const playerCenterX = player.x + PLAYER_W / 2;
-  const holdingDown = keys['s'] || keys['arrowdown'];
-  if (playerBottom >= PLATFORM_Y && player.vy >= 0 &&
-      playerCenterX > PLATFORM_X && playerCenterX < PLATFORM_X + PLATFORM_W &&
-      player.y + PLAYER_H - player.vy * dt <= PLATFORM_Y + 10) {
-    player.y = PLATFORM_Y - PLAYER_H;
-    player.vy = 0;
-    player.onGround = true;
-    player.airJumps = 1;
+    player.x += player.vx * dt;
+    player.onGround = false;
   } else {
-    // Check floating platforms (one-way, player-only)
-    let landedOnFloat = false;
-    if (player.vy >= 0) {
-      for (const fp of floatingPlatforms) {
-        if (fp.phase !== 'solid' && fp.phase !== 'warning') continue;
-        const fpTop = fp.y;
-        const fpLeft = fp.x;
-        const fpRight = fp.x + fp.w;
-        // Player center must be over platform
-        if (playerCenterX <= fpLeft || playerCenterX >= fpRight) continue;
-        // Falling through top surface check
-        if (playerBottom >= fpTop && player.y + PLAYER_H - player.vy * dt <= fpTop + 6) {
-          // Drop-through: holding down while on or near this platform
-          if (holdingDown) continue;
-          player.y = fpTop - PLAYER_H;
-          player.vy = 0;
-          player.onGround = true;
-          player.airJumps = 1;
-          landedOnFloat = true;
-          break;
-        }
+    // Jump (SSBM-style double jump)
+    const jumpInput = keys['w'] || keys['arrowup'] || keys[' '];
+    if (jumpInput && !player.jumpHeld) {
+      if (player.onGround) {
+        // Grounded jump — full force
+        player.vy = JUMP_FORCE;
+        player.onGround = false;
+      } else if (player.airJumps > 0) {
+        // Aerial double jump — slightly weaker, resets vertical momentum
+        player.vy = JUMP_FORCE * 0.85;
+        player.airJumps--;
       }
     }
-    if (!landedOnFloat && playerBottom < PLATFORM_Y) {
-      player.onGround = false;
+    player.jumpHeld = jumpInput;
+
+    // Gravity
+    player.vy += GRAVITY * dt;
+
+    // Apply velocity
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+
+    // Platform collision
+    const playerBottom = player.y + PLAYER_H;
+    const playerCenterX = player.x + PLAYER_W / 2;
+    const holdingDown = keys['s'] || keys['arrowdown'];
+    if (playerBottom >= PLATFORM_Y && player.vy >= 0 &&
+        playerCenterX > PLATFORM_X && playerCenterX < PLATFORM_X + PLATFORM_W &&
+        player.y + PLAYER_H - player.vy * dt <= PLATFORM_Y + 10) {
+      player.y = PLATFORM_Y - PLAYER_H;
+      player.vy = 0;
+      player.onGround = true;
+      player.airJumps = 1;
+    } else {
+      // Check floating platforms (one-way, player-only)
+      let landedOnFloat = false;
+      if (player.vy >= 0) {
+        for (const fp of floatingPlatforms) {
+          if (fp.phase !== 'solid' && fp.phase !== 'warning') continue;
+          const fpTop = fp.y;
+          const fpLeft = fp.x;
+          const fpRight = fp.x + fp.w;
+          // Player center must be over platform
+          if (playerCenterX <= fpLeft || playerCenterX >= fpRight) continue;
+          // Falling through top surface check
+          if (playerBottom >= fpTop && player.y + PLAYER_H - player.vy * dt <= fpTop + 6) {
+            // Drop-through: holding down while on or near this platform
+            if (holdingDown) continue;
+            player.y = fpTop - PLAYER_H;
+            player.vy = 0;
+            player.onGround = true;
+            player.airJumps = 1;
+            landedOnFloat = true;
+            break;
+          }
+        }
+      }
+      if (!landedOnFloat && playerBottom < PLATFORM_Y) {
+        player.onGround = false;
+      }
     }
   }
 
@@ -2132,6 +2202,26 @@ function updatePlayer(dt) {
   player.muscleTimer = Math.max(0, player.muscleTimer - dt);
   player.slamCooldown = Math.max(0, player.slamCooldown - dt);
   player.snotCooldown = Math.max(0, player.snotCooldown - dt);
+  const prevWingsTimer = player.wingsTimer;
+  player.wingsTimer = Math.max(0, player.wingsTimer - dt);
+  player.poopCooldown = Math.max(0, player.poopCooldown - dt);
+  // Wings expiry — spawn feather burst
+  if (prevWingsTimer > 0 && player.wingsTimer <= 0) {
+    const pcxW = player.x + PLAYER_W / 2;
+    const pcyW = player.y + PLAYER_H / 2;
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      particles.push({
+        x: pcxW + Math.cos(angle) * 10,
+        y: pcyW + Math.sin(angle) * 10,
+        vx: Math.cos(angle) * 80 + (Math.random() - 0.5) * 40,
+        vy: Math.sin(angle) * 80 - 30,
+        life: 0.8, maxLife: 0.8,
+        color: Math.random() < 0.5 ? '#ffdd88' : '#ffffff', size: 3
+      });
+    }
+    playSound('platCrumble');
+  }
 
   // Snot rocket hold-to-charge
   if (player.snotHolding) {
@@ -2150,10 +2240,18 @@ function updatePlayer(dt) {
     }
   }
 
-  // Lightning attack (left click or right click)
-  if ((mouse.left || mouse.right) && player.lightningCooldown <= 0) {
-    player.lightningCooldown = LIGHTNING_COOLDOWN;
-    fireLightning();
+  // Attack: poop dropper while flying, lightning otherwise
+  if (player.wingsTimer > 0) {
+    if ((mouse.left || mouse.right) && player.poopCooldown <= 0) {
+      player.poopCooldown = POOP_COOLDOWN;
+      firePoopBomb();
+    }
+  } else {
+    // Lightning attack (left click or right click)
+    if ((mouse.left || mouse.right) && player.lightningCooldown <= 0) {
+      player.lightningCooldown = LIGHTNING_COOLDOWN;
+      fireLightning();
+    }
   }
 }
 
@@ -2161,10 +2259,11 @@ function drawPlayer() {
   const px = player.x;
   const py = player.y;
 
-  // Iframes flicker (not during metal or muscle mode)
-  if (player.metalTimer <= 0 && player.muscleTimer <= 0 && player.iframes > 0 && Math.floor(player.iframes * 15) % 2 === 0) return;
+  // Iframes flicker (not during metal, muscle, or wings mode)
+  if (player.metalTimer <= 0 && player.muscleTimer <= 0 && player.wingsTimer <= 0 && player.iframes > 0 && Math.floor(player.iframes * 15) % 2 === 0) return;
   const isMetal = player.metalTimer > 0;
   const isMuscle = player.muscleTimer > 0;
+  const isFlying = player.wingsTimer > 0;
 
   ctx.save();
   const cx = px + PLAYER_W / 2;
@@ -2193,10 +2292,39 @@ function drawPlayer() {
     ctx.stroke();
   }
 
+  // Wings mode golden aura ring (drawn behind player)
+  if (isFlying && !isMetal) {
+    const auraPhase = performance.now() * 0.005;
+    const auraRadius = 55 + Math.sin(auraPhase) * 6;
+    const auraAlpha = 0.2 + 0.1 * Math.sin(auraPhase * 2);
+    ctx.strokeStyle = `rgba(255,220,100,${auraAlpha})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, auraRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(255,240,180,${auraAlpha * 0.5})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, auraRadius - 5, 0, Math.PI * 2);
+    ctx.stroke();
+    // Spawn feather particles while flying
+    if (Math.random() < 0.15) {
+      particles.push({
+        x: cx + (Math.random() - 0.5) * 40,
+        y: cy + PLAYER_H / 2,
+        vx: (Math.random() - 0.5) * 30,
+        vy: 20 + Math.random() * 30,
+        life: 0.6, maxLife: 0.6,
+        color: Math.random() < 0.5 ? '#ffdd88' : '#fff8e0', size: 2
+      });
+    }
+  }
+
   // Draw sprite
   const useMetalSprite = isMetal && metalSpriteLoaded;
   const useMuscleSprite = isMuscle && !isMetal && muscleSpriteLoaded;
-  const currentSprite = useMetalSprite ? metalSprite : (useMuscleSprite ? muscleSprite : eggSprite);
+  const useWingsSprite = isFlying && !isMetal && !useMuscleSprite && wingsSpriteLoaded;
+  const currentSprite = useMetalSprite ? metalSprite : (useMuscleSprite ? muscleSprite : (useWingsSprite ? wingsSprite : eggSprite));
   if (spriteLoaded) {
     ctx.save();
     if (!player.facingRight) {
