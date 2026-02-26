@@ -1,0 +1,7 @@
+name = "eggthony-leaderboard"
+main = "src/index.js"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "SCORES"
+id = "59f65a78e92542fda8263a031c6a210e"
