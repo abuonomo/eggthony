@@ -1003,6 +1003,10 @@ const DWYER_ATTACK_COOLDOWN = 0.6;
 const DWYER_LANDING_AOE_RADIUS = 200;
 const DWYER_LANDING_DAMAGE = 35;
 
+const SNOT_STORM_DURATION = 8.0;
+const SNOT_STORM_AOE = 80;
+const SNOT_STORM_AOE_DMG = 10;
+
 const PLAYER_MAX_HP = 100;
 const IFRAME_DURATION = 0.8;
 const CONTACT_DAMAGE = 10;
@@ -1088,6 +1092,7 @@ let gameOverCooldown = 0;
 let gameOverPhase = 'waiting'; // waiting, input, submitted, showing
 let titleBlink = 0;
 let snotReadyFlash = 0;
+let snotStormFlash = 0;
 
 // Dev menu state
 let devMenuOpen = false;
@@ -1260,7 +1265,7 @@ function updateBoss(dt) {
       const playerFeet = player.y + PLAYER_H;
       if (playerFeet < boss.y + boss.h * 0.4) {
         const upHeld = keys['w'] || keys['arrowup'] || keys['joyup'];
-        const stompDmg = upHeld ? 50 : 30;
+        const stompDmg = upHeld ? 120 : 60;
         damageBoss(stompDmg, 0, 0);
         player.vy = upHeld ? -680 : -560;
         player.iframes = 0.8;
@@ -1274,6 +1279,28 @@ function updateBoss(dt) {
           addShake(4, 0.1);
         }
         playSound('stomp');
+        // Snot Storm chain tracking
+        player.stompChain++;
+        if (player.stompChain >= 3) {
+          player.snotStormTimer = SNOT_STORM_DURATION;
+          player.stompChain = 0;
+          addShake(8, 0.2);
+          playSound('powerup');
+          snotStormFlash = 1.5;
+          const pcxS = player.x + PLAYER_W / 2;
+          const pcyS = player.y + PLAYER_H / 2;
+          for (let sp = 0; sp < 16; sp++) {
+            const angle = (sp / 16) * Math.PI * 2;
+            particles.push({
+              x: pcxS + Math.cos(angle) * 30,
+              y: pcyS + Math.sin(angle) * 30,
+              vx: Math.cos(angle) * 120,
+              vy: Math.sin(angle) * 120,
+              life: 0.6, maxLife: 0.6,
+              color: sp % 2 === 0 ? '#88ff44' : '#ccff88', size: 4
+            });
+          }
+        }
       }
     }
     return;
@@ -2495,7 +2522,9 @@ const player = {
   airJumps: 1,
   jumpHeld: false,
   wingsTimer: 0,
-  poopCooldown: 0
+  poopCooldown: 0,
+  stompChain: 0,
+  snotStormTimer: 0
 };
 
 function resetPlayer() {
@@ -2518,7 +2547,10 @@ function resetPlayer() {
   player.jumpHeld = false;
   player.wingsTimer = 0;
   player.poopCooldown = 0;
+  player.stompChain = 0;
+  player.snotStormTimer = 0;
   lowHpTriggered = false;
+  snotStormFlash = 0;
 }
 
 function updatePlayer(dt) {
@@ -2582,6 +2614,9 @@ function updatePlayer(dt) {
       player.vy = 0;
       player.onGround = true;
       player.airJumps = 1;
+      if (player.stompChain > 0 && player.snotStormTimer <= 0) {
+        player.stompChain = 0;
+      }
     } else {
       // Check floating platforms (one-way, player-only)
       let landedOnFloat = false;
@@ -2601,6 +2636,9 @@ function updatePlayer(dt) {
             player.vy = 0;
             player.onGround = true;
             player.airJumps = 1;
+            if (player.stompChain > 0 && player.snotStormTimer <= 0) {
+              player.stompChain = 0;
+            }
             landedOnFloat = true;
             break;
           }
@@ -2640,6 +2678,8 @@ function updatePlayer(dt) {
   const prevWingsTimer = player.wingsTimer;
   player.wingsTimer = Math.max(0, player.wingsTimer - dt);
   player.poopCooldown = Math.max(0, player.poopCooldown - dt);
+  player.snotStormTimer = Math.max(0, player.snotStormTimer - dt);
+  if (snotStormFlash > 0) snotStormFlash -= dt;
   // Wings expiry — spawn feather burst
   if (prevWingsTimer > 0 && player.wingsTimer <= 0) {
     const pcxW = player.x + PLAYER_W / 2;
@@ -2865,12 +2905,15 @@ function fireLightning() {
   const cx = player.x + PLAYER_W / 2;
   const cy = player.y + PLAYER_H / 2;
   const angle = Math.atan2(mouse.y - cy, mouse.x - cx);
+  const isStorm = player.snotStormTimer > 0;
+  const speed = isStorm ? LIGHTNING_SPEED * 0.6 : LIGHTNING_SPEED;
   lightningBolts.push({
     x: cx,
     y: cy,
-    vx: Math.cos(angle) * LIGHTNING_SPEED,
-    vy: Math.sin(angle) * LIGHTNING_SPEED,
-    life: 1.5,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    life: isStorm ? 2.0 : 1.5,
+    snotStorm: isStorm,
     segments: generateLightningSegments()
   });
   playSound('lightning');
@@ -2913,7 +2956,35 @@ function updateLightning(dt) {
       const dist = Math.hypot(b.x - ecx, b.y - ecy);
       if (dist < e.w / 2 + 10) {
         damageEnemy(j, LIGHTNING_DAMAGE, b.vx * 0.3, -100);
-        spawnParticles(b.x, b.y, '#77ccff', 5, 100, 0.3);
+        const hitColor = player.snotStormTimer > 0 ? '#88ff44' : '#77ccff';
+        spawnParticles(b.x, b.y, hitColor, 5, 100, 0.3);
+        // Snot Storm AOE splash
+        if (player.snotStormTimer > 0) {
+          for (let k = enemies.length - 1; k >= 0; k--) {
+            if (k === j || enemies[k].dying) continue;
+            const ek = enemies[k];
+            const adist = Math.hypot(b.x - (ek.x + ek.w/2), b.y - (ek.y + ek.h/2));
+            if (adist < SNOT_STORM_AOE) {
+              damageEnemy(k, SNOT_STORM_AOE_DMG, 0, -50);
+              ek.freezeTimer = Math.max(ek.freezeTimer, 1.0);
+            }
+          }
+          // Big snotty explosion burst
+          spawnParticles(b.x, b.y, '#88ff44', 18, 200, 0.5);
+          spawnParticles(b.x, b.y, '#66cc22', 8, 120, 0.6);
+          // AOE radius ring
+          for (let r = 0; r < 10; r++) {
+            const a = (r / 10) * Math.PI * 2;
+            particles.push({
+              x: b.x + Math.cos(a) * SNOT_STORM_AOE * 0.5,
+              y: b.y + Math.sin(a) * SNOT_STORM_AOE * 0.5,
+              vx: Math.cos(a) * 60,
+              vy: Math.sin(a) * 60,
+              life: 0.3, maxLife: 0.3,
+              color: '#aaff66', size: 3
+            });
+          }
+        }
         lightningBolts.splice(i, 1);
         boltConsumed = true;
         break;
@@ -2927,7 +2998,24 @@ function updateLightning(dt) {
       const dist = Math.hypot(b.x - bcx, b.y - bcy);
       if (dist < boss.w / 2 + 10) {
         damageBoss(LIGHTNING_DAMAGE, b.vx * 0.3, -100);
-        spawnParticles(b.x, b.y, '#77ccff', 5, 100, 0.3);
+        const hitColor = player.snotStormTimer > 0 ? '#88ff44' : '#77ccff';
+        spawnParticles(b.x, b.y, hitColor, 5, 100, 0.3);
+        if (player.snotStormTimer > 0) {
+          if (boss) boss.freezeTimer = Math.max(boss.freezeTimer, 0.5);
+          spawnParticles(b.x, b.y, '#88ff44', 18, 200, 0.5);
+          spawnParticles(b.x, b.y, '#66cc22', 8, 120, 0.6);
+          for (let r = 0; r < 10; r++) {
+            const a = (r / 10) * Math.PI * 2;
+            particles.push({
+              x: b.x + Math.cos(a) * SNOT_STORM_AOE * 0.5,
+              y: b.y + Math.sin(a) * SNOT_STORM_AOE * 0.5,
+              vx: Math.cos(a) * 60,
+              vy: Math.sin(a) * 60,
+              life: 0.3, maxLife: 0.3,
+              color: '#aaff66', size: 3
+            });
+          }
+        }
         lightningBolts.splice(i, 1);
       }
     }
@@ -2936,32 +3024,108 @@ function updateLightning(dt) {
 
 function drawLightning() {
   for (const b of lightningBolts) {
+    const storm = b.snotStorm;
     const angle = Math.atan2(b.vy, b.vx);
-    const len = 20;
+    const len = storm ? 28 : 20;
     ctx.save();
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 3;
-    ctx.shadowColor = '#4488ff';
-    ctx.shadowBlur = 15;
+    ctx.strokeStyle = storm ? '#ccff88' : '#ffffff';
+    ctx.lineWidth = storm ? 5 : 3;
+    ctx.shadowColor = storm ? '#88ff44' : '#4488ff';
+    ctx.shadowBlur = storm ? 22 : 15;
     ctx.beginPath();
     ctx.moveTo(b.x - Math.cos(angle) * len, b.y - Math.sin(angle) * len);
     for (const s of b.segments) {
-      ctx.lineTo(b.x + s.ox, b.y + s.oy);
+      const jScale = storm ? 1.6 : 1;
+      ctx.lineTo(b.x + s.ox * jScale, b.y + s.oy * jScale);
     }
     ctx.lineTo(b.x + Math.cos(angle) * 5, b.y + Math.sin(angle) * 5);
     ctx.stroke();
 
     // Glow core
-    ctx.strokeStyle = '#aaddff';
-    ctx.lineWidth = 1;
+    ctx.strokeStyle = storm ? '#eeffcc' : '#aaddff';
+    ctx.lineWidth = storm ? 2 : 1;
     ctx.stroke();
     ctx.restore();
 
     // Glow dot at tip
-    ctx.fillStyle = 'rgba(150,200,255,0.8)';
+    ctx.fillStyle = storm ? 'rgba(136,255,68,0.9)' : 'rgba(150,200,255,0.8)';
     ctx.beginPath();
-    ctx.arc(b.x, b.y, 4, 0, Math.PI * 2);
+    ctx.arc(b.x, b.y, storm ? 7 : 4, 0, Math.PI * 2);
     ctx.fill();
+
+    // Snot drip trail for storm bolts
+    if (storm) {
+      ctx.fillStyle = 'rgba(100,200,40,0.4)';
+      ctx.beginPath();
+      ctx.arc(b.x - Math.cos(angle) * 10, b.y - Math.sin(angle) * 10, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(b.x - Math.cos(angle) * 20, b.y - Math.sin(angle) * 20, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+}
+
+function drawSnotStormOverlay() {
+  if (player.snotStormTimer <= 0) return;
+  const ratio = player.snotStormTimer / SNOT_STORM_DURATION;
+  // Flash faster when about to end (last 30%)
+  let alpha;
+  if (ratio < 0.3) {
+    // Rapid flashing — frequency increases as it runs out
+    const flashSpeed = 0.006 + (1 - ratio / 0.3) * 0.025;
+    const flash = 0.5 + 0.5 * Math.sin(performance.now() * flashSpeed);
+    alpha = 0.08 + flash * 0.2;
+  } else {
+    alpha = 0.12 + 0.04 * Math.sin(performance.now() * 0.003);
+  }
+  // Green vignette on all edges — thicker booger drips
+  const edgeW = 30;
+  // Top edge
+  const gTop = ctx.createLinearGradient(0, 0, 0, edgeW);
+  gTop.addColorStop(0, `rgba(80,180,30,${alpha * 1.5})`);
+  gTop.addColorStop(0.5, `rgba(100,200,40,${alpha * 0.5})`);
+  gTop.addColorStop(1, 'rgba(100,200,40,0)');
+  ctx.fillStyle = gTop;
+  ctx.fillRect(0, 0, W, edgeW);
+  // Bottom edge
+  const gBot = ctx.createLinearGradient(0, H, 0, H - edgeW);
+  gBot.addColorStop(0, `rgba(80,180,30,${alpha * 1.5})`);
+  gBot.addColorStop(0.5, `rgba(100,200,40,${alpha * 0.5})`);
+  gBot.addColorStop(1, 'rgba(100,200,40,0)');
+  ctx.fillStyle = gBot;
+  ctx.fillRect(0, H - edgeW, W, edgeW);
+  // Left edge
+  const gLeft = ctx.createLinearGradient(0, 0, edgeW, 0);
+  gLeft.addColorStop(0, `rgba(80,180,30,${alpha * 1.5})`);
+  gLeft.addColorStop(0.5, `rgba(100,200,40,${alpha * 0.5})`);
+  gLeft.addColorStop(1, 'rgba(100,200,40,0)');
+  ctx.fillStyle = gLeft;
+  ctx.fillRect(0, 0, edgeW, H);
+  // Right edge
+  const gRight = ctx.createLinearGradient(W, 0, W - edgeW, 0);
+  gRight.addColorStop(0, `rgba(80,180,30,${alpha * 1.5})`);
+  gRight.addColorStop(0.5, `rgba(100,200,40,${alpha * 0.5})`);
+  gRight.addColorStop(1, 'rgba(100,200,40,0)');
+  ctx.fillStyle = gRight;
+  ctx.fillRect(W - edgeW, 0, edgeW, H);
+  // Booger drip blobs along top edge
+  const t = performance.now() * 0.001;
+  ctx.fillStyle = `rgba(90,190,35,${alpha * 1.8})`;
+  for (let i = 0; i < 8; i++) {
+    const bx = (i / 8) * W + 30;
+    const dripLen = 8 + 12 * Math.sin(t * 1.2 + i * 2.1);
+    const blobR = 4 + 2 * Math.sin(t * 0.8 + i * 1.7);
+    ctx.beginPath();
+    ctx.arc(bx, dripLen, blobR, 0, Math.PI * 2);
+    ctx.fill();
+    // Drip strand
+    ctx.strokeStyle = `rgba(90,190,35,${alpha * 1.2})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(bx, 0);
+    ctx.quadraticCurveTo(bx + Math.sin(t + i) * 3, dripLen * 0.5, bx, dripLen);
+    ctx.stroke();
   }
 }
 
@@ -3413,7 +3577,7 @@ function updateEnemies(dt) {
           const knockDir = Math.sign(e.x + e.w/2 - (player.x + PLAYER_W/2)) || 1;
           // Power stomp: flick up at moment of impact (down-up cadence)
           const upHeld = keys['w'] || keys['arrowup'] || keys['joyup'];
-          const stompDmg = upHeld ? 50 : 30;
+          const stompDmg = upHeld ? 120 : 60;
           damageEnemy(i, stompDmg, knockDir * 100, 50);
           // Bounce: base -560, power stomp -680
           player.vy = upHeld ? -680 : -560;
@@ -3427,6 +3591,29 @@ function updateEnemies(dt) {
             addShake(4, 0.1);
           }
           playSound('stomp');
+          // Snot Storm chain tracking
+          player.stompChain++;
+          if (player.stompChain >= 3) {
+            player.snotStormTimer = SNOT_STORM_DURATION;
+            player.stompChain = 0;
+            addShake(8, 0.2);
+            playSound('powerup');
+            snotStormFlash = 1.5;
+            // Ring of green particles around player
+            const pcxS = player.x + PLAYER_W / 2;
+            const pcyS = player.y + PLAYER_H / 2;
+            for (let sp = 0; sp < 16; sp++) {
+              const angle = (sp / 16) * Math.PI * 2;
+              particles.push({
+                x: pcxS + Math.cos(angle) * 30,
+                y: pcyS + Math.sin(angle) * 30,
+                vx: Math.cos(angle) * 120,
+                vy: Math.sin(angle) * 120,
+                life: 0.6, maxLife: 0.6,
+                color: sp % 2 === 0 ? '#88ff44' : '#ccff88', size: 4
+              });
+            }
+          }
         }
       }
       continue;
@@ -4869,6 +5056,88 @@ function drawHUD() {
     ctx.fillText('DWYER', W / 2, dby + 10);
   }
 
+  // Snot Storm mode indicator
+  if (player.snotStormTimer > 0) {
+    const ssBarW = 100;
+    const ssBarH = 10;
+    const ssbx = W / 2 - ssBarW / 2;
+    let ssby = 50;
+    if (player.metalTimer > 0) ssby += 14;
+    if (player.muscleTimer > 0) ssby += 14;
+    if (player.wingsTimer > 0) ssby += 14;
+    if (dwyer) ssby += 14;
+    const ssRatio = player.snotStormTimer / SNOT_STORM_DURATION;
+    // Flash the bar when about to expire
+    let barVisible = true;
+    if (ssRatio < 0.3) {
+      const flashSpeed = 0.008 + (1 - ssRatio / 0.3) * 0.03;
+      barVisible = Math.sin(performance.now() * flashSpeed) > -0.3;
+    }
+    if (barVisible) {
+      ctx.fillStyle = '#112200';
+      ctx.fillRect(ssbx, ssby, ssBarW, ssBarH);
+      ctx.fillStyle = ssRatio < 0.3 ? '#448822' : '#88ff44';
+      ctx.fillRect(ssbx, ssby, ssBarW * ssRatio, ssBarH);
+      ctx.strokeStyle = '#88ff44';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(ssbx, ssby, ssBarW, ssBarH);
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillStyle = '#ccffaa';
+      ctx.fillText('SNOT STORM', W / 2, ssby + 10);
+    }
+  }
+
+  // Stomp chain counter (airborne, chain > 0)
+  if (player.stompChain > 0 && !player.onGround) {
+    const cx = player.x + PLAYER_W / 2;
+    const cy = player.y - 18;
+    const chain = player.stompChain;
+    const pulse = 1.0 + 0.1 * Math.sin(performance.now() * 0.01);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.translate(cx, cy);
+    ctx.scale(pulse, pulse);
+    // Draw filled pips
+    const pipW = 10, pipH = 6, pipGap = 3;
+    const totalW = 3 * pipW + 2 * pipGap;
+    const startX = -totalW / 2;
+    for (let p = 0; p < 3; p++) {
+      const px = startX + p * (pipW + pipGap);
+      ctx.fillStyle = p < chain ? '#88ff44' : 'rgba(136,255,68,0.2)';
+      ctx.shadowColor = p < chain ? '#88ff44' : 'transparent';
+      ctx.shadowBlur = p < chain ? 6 : 0;
+      ctx.fillRect(px, -pipH / 2, pipW, pipH);
+      ctx.strokeStyle = '#88ff44';
+      ctx.lineWidth = 0.5;
+      ctx.strokeRect(px, -pipH / 2, pipW, pipH);
+    }
+    // Text label
+    ctx.shadowBlur = 0;
+    ctx.font = 'bold 10px monospace';
+    ctx.fillStyle = '#88ff44';
+    ctx.fillText(chain + '/3', 0, pipH / 2 + 12);
+    ctx.restore();
+  }
+
+  // "SNOT STORM!" activation flash
+  if (snotStormFlash > 0) {
+    const alpha = snotStormFlash > 1.0 ? (1.5 - snotStormFlash) * 2 : Math.min(1, snotStormFlash / 1.0);
+    const bob = Math.sin(performance.now() * 0.008) * 3;
+    const scale = 1.0 + (1.5 - snotStormFlash) * 0.15;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 22px monospace';
+    ctx.fillStyle = `rgba(136,255,68,${alpha})`;
+    ctx.shadowColor = '#88ff44';
+    ctx.shadowBlur = 12;
+    ctx.translate(W / 2, 120 + bob);
+    ctx.scale(scale, scale);
+    ctx.fillText('SNOT STORM!', 0, 0);
+    ctx.shadowBlur = 0;
+    ctx.restore();
+  }
+
   // Snot rocket cooldown / charge indicator
   if (player.snotHolding) {
     // Show charge bar while holding
@@ -5470,6 +5739,7 @@ function draw() {
     drawDamageNumbers();
     drawHUD();
     drawBossHPBar();
+    drawSnotStormOverlay();
     if (isMobile && window.drawTouchHUD) window.drawTouchHUD();
 
     if (gameState === 'paused') {
