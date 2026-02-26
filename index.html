@@ -413,6 +413,7 @@ let metalHatSprite = null, metalHatSpriteLoaded = false;
 let smoothieSprite = null, smoothieSpriteLoaded = false;
 let dwyerSprite = null, dwyerSpriteLoaded = false;
 let chestplateSprite = null, chestplateSpriteLoaded = false;
+let swordSprite = null, swordSpriteLoaded = false;
 
 const spriteFiles = [
   ['data/grunt.png',           (s) => { gruntSprite = s; gruntSpriteLoaded = true; }],
@@ -422,6 +423,7 @@ const spriteFiles = [
   ['data/smoothie.png',        (s) => { smoothieSprite = s; smoothieSpriteLoaded = true; }],
   ['data/dwyer_soldier.png',   (s) => { dwyerSprite = s; dwyerSpriteLoaded = true; }],
   ['data/chesplate.png',       (s) => { chestplateSprite = s; chestplateSpriteLoaded = true; }],
+  ['data/sword.png',           (s) => { swordSprite = s; swordSpriteLoaded = true; }],
 ];
 for (const [src, cb] of spriteFiles) {
   const raw = new Image();
@@ -4198,23 +4200,46 @@ function drawDwyer() {
     ctx.fillRect(eyeX, dy + 38, 10, 10);
   }
 
-  // Sword slash visual
-  if (dwyer.attackTimer > 0) {
-    const slashAlpha = dwyer.attackTimer / 0.3;
-    const slashX = dwyer.facingRight ? dx + dwyer.w : dx;
-    const slashDir = dwyer.facingRight ? 1 : -1;
-    ctx.strokeStyle = `rgba(255,220,100,${slashAlpha})`;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    const angle = (1 - dwyer.attackTimer / 0.3) * Math.PI * 0.8 - Math.PI * 0.4;
-    ctx.arc(slashX, dy + dwyer.h * 0.4, 45, angle - 0.5 * slashDir, angle + 0.5 * slashDir);
-    ctx.stroke();
-    // Second thicker arc
-    ctx.strokeStyle = `rgba(255,255,200,${slashAlpha * 0.5})`;
-    ctx.lineWidth = 6;
-    ctx.beginPath();
-    ctx.arc(slashX, dy + dwyer.h * 0.4, 36, angle - 0.35 * slashDir, angle + 0.35 * slashDir);
-    ctx.stroke();
+  // Sword — swings during attack, held at side otherwise
+  if (!dwyer.entering) {
+    const swordSize = 50;
+    const pivotX = dwyer.facingRight ? dx + dwyer.w - 10 : dx + 10;
+    const pivotY = dy + dwyer.h * 0.4;
+    const flipX = dwyer.facingRight ? 1 : -1;
+
+    ctx.save();
+    ctx.translate(pivotX, pivotY);
+    ctx.scale(flipX, 1);
+
+    if (dwyer.attackTimer > 0) {
+      // Swing arc: rotate from raised (-90deg) to slashed forward (+30deg)
+      const swingProgress = 1 - dwyer.attackTimer / 0.3;
+      const swingAngle = -Math.PI * 0.5 + swingProgress * Math.PI * 0.65;
+      ctx.rotate(swingAngle);
+
+      // Slash trail arc behind the sword
+      const trailAlpha = dwyer.attackTimer / 0.3 * 0.6;
+      ctx.strokeStyle = `rgba(255,220,100,${trailAlpha})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, swordSize * 0.8, -Math.PI * 0.5, swingAngle, false);
+      ctx.stroke();
+    } else {
+      // Idle: held down at a slight angle
+      ctx.rotate(Math.PI * 0.15);
+    }
+
+    if (swordSpriteLoaded) {
+      ctx.drawImage(swordSprite, -6, -swordSize + 8, swordSize, swordSize);
+    } else {
+      // Procedural fallback — simple blade shape
+      ctx.fillStyle = '#ccccdd';
+      ctx.fillRect(-3, -swordSize + 8, 6, swordSize * 0.65);
+      ctx.fillStyle = '#ddaa44';
+      ctx.fillRect(-5, -swordSize + 8 + swordSize * 0.65, 10, 8);
+    }
+
+    ctx.restore();
   }
 
   // Landing shockwave ring
