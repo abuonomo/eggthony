@@ -96,8 +96,9 @@ function ensureAudio() {
   // Unlock HTML Audio elements on first interaction (autoplay policy)
   if (!audioUnlocked) {
     audioUnlocked = true;
-    for (const clip of [...Object.values(voiceClips), snotSniffleClip, snotLaunchClip]) {
-      clip.play().then(() => { clip.pause(); clip.currentTime = 0; }).catch(() => {});
+    // Touch the clips to unlock them for autoplay policy (load without playing)
+    for (const clip of [...Object.values(voiceClips), snotSniffleClip, snotLaunchClip, dwyerClip]) {
+      clip.load();
     }
   }
 }
@@ -310,6 +311,12 @@ for (const [name, clip] of Object.entries(voiceClips)) {
   clip.preload = 'auto';
   clip.addEventListener('error', () => console.warn('Audio load failed:', name, clip.error));
 }
+// Pre-fetch start clip as ArrayBuffer for instant Web Audio playback
+let startClipBuffer = null;
+fetch(encodeURI('data/sounds/Start game trimmed.m4a'))
+  .then(r => r.arrayBuffer())
+  .then(buf => { startClipBuffer = buf; })
+  .catch(() => {});
 let lowHpTriggered = false;
 let goodClipToggle = false;
 let activeVoice = null;
@@ -325,6 +332,20 @@ function playVoice(name, force) {
     activeVoice.pause();
     activeVoice.currentTime = 0;
   }
+
+  // Use pre-decoded Web Audio buffer for start clip (instant playback)
+  if (name === 'start' && startClipBuffer && audioCtx) {
+    audioCtx.decodeAudioData(startClipBuffer.slice(0), (decoded) => {
+      const source = audioCtx.createBufferSource();
+      source.buffer = decoded;
+      source.connect(audioCtx.destination);
+      source.start(0);
+    }, () => {});
+    startClipBuffer = null; // only use once, then fall back to normal
+    activeVoice = voiceClips[name]; // track it for isVoicePlaying
+    return;
+  }
+
   const clip = voiceClips[name];
   if (!clip) return;
   clip.currentTime = 0;
