@@ -18,6 +18,8 @@ Eggthony: Lightning Egg — single-file HTML5 Canvas arena brawler. All game cod
 - Snot rocket: 8s cooldown, 120px AOE, 3s freeze
 - Floating platforms: 100x12, 5s solid + 1.5s warning, max 2 alive, 4s spawn CD
 - Boss: every 3rd round, scales +200 HP/+10 dmg/+15 speed per appearance
+- QP Boss (app >= 3): size resets to 1.0, scale growth 0.15/app, dmg capped at 30, charge 320 base
+- Fart cloud: 130px radius, 4s duration, 12 DPS (0.5s tick)
 
 ## Code Organization (top to bottom)
 1. Canvas setup & sizing (~1-60)
@@ -49,7 +51,9 @@ Eggthony: Lightning Egg — single-file HTML5 Canvas arena brawler. All game cod
 - **Themes:** `getTheme()` returns current theme object with colors, decorStyle, ambientType. All drawing functions read from theme.
 - **Player collision:** Main platform first, then floating platforms (one-way, drop-through with S/Down). Enemies/boss only use PLATFORM_Y.
 - **Powerup modes:** `player.metalTimer > 0` = metal mode, `player.muscleTimer > 0` = muscle mode. Both can overlap.
-- **Boss phases:** idle → charge or pound_jump → pound_land → shockwave → idle. Rage at ≤30% HP.
+- **Boss phases:** idle → charge or pound_jump → pound_land → shockwave → idle. Rage at ≤30% HP. QP also has fart_windup → fart_release.
+- **QP boss:** `boss.isQuentinPizza` flag. Uses `qpApp` (app - 2) for size/damage scaling so first QP appearance starts at base size. Immediately farts on entering.
+- **Dev menu:** Hidden on title screen. `devMenuOpen`, `devTapCount`, `devTapTimer` state vars. Tap top-left 80x80 zone 5x to open. Mobile touch handled directly in touchstart (not via click event). On round select, sets `currentThemeIndex = getThemeIndex(r)` before `startRound(r)`.
 - **Enemy types:** grunt (basic), spitter (ranged), brute (charging). Type determined at spawn by round-based probability.
 - **State resets:** Game restart clears state in TWO click handlers (title and gameOver) plus `startRound()`. All three must stay in sync.
 
@@ -64,4 +68,4 @@ Eggthony: Lightning Egg — single-file HTML5 Canvas arena brawler. All game cod
 - New enemies: add to `spawnEnemyForRound()` and `updateEnemies()`/`drawEnemies()`
 - New powerups: follow metal hat / smoothie pattern (spawn timer, update, draw, player state)
 - New themes: add entry to THEMES array, implement decorStyle in `drawPlatform()`
-- State resets: update BOTH click handlers AND `startRound()` when adding persistent state
+- State resets: update BOTH click handlers, dev menu round select handler, AND `startRound()` when adding persistent state

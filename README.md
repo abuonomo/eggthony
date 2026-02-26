@@ -46,13 +46,18 @@ Works on desktop (keyboard + mouse) and mobile (touch controls auto-detected).
 
 All enemies gain +15 HP per round. Waves get larger (3 + round x 3 enemies) and spawn faster as rounds progress.
 
-### Boss: Evil Eggthony
+### Bosses
 
-Appears every 3rd round (3, 6, 9...). Scales in HP, damage, speed, and size with each appearance.
+Bosses appear every 3rd round (3, 6, 9...). Scales in HP, damage, speed, and size with each appearance.
+
+**Evil Eggthony** (rounds 3, 6) - The original boss. Grows larger and stronger each appearance.
+
+**Quentin Pizza** (rounds 9+) - Replaces Evil Eggthony from the 3rd boss appearance onward. Square sprite, resets to base size on first appearance. Rips a fart immediately upon landing. Size and stats scale more gently than Evil Eggthony.
 
 **Attacks:**
 - **Charge** - Winds up then rushes across the platform at high speed, bouncing off edges
 - **Ground Pound** - Jumps to your predicted position and slams down, creating an expanding shockwave ring
+- **Fart Cloud** (QP only) - Releases a toxic cloud (130px radius) that deals damage over time for 4 seconds
 - **Rage Mode** - Below 30% HP: faster attacks, shorter cooldowns, red aura intensifies
 
 ### Powerups
@@ -100,6 +105,10 @@ Transitions use a fade-to-black effect with theme announcement.
 - **Audio:** All SFX procedurally generated via Web Audio API oscillators. Voice clips are pre-recorded M4A files.
 - **Architecture:** Single-file (`index.html`, ~3700 lines). No frameworks, no build tools, no external dependencies.
 
+### Dev Menu
+
+Hidden developer menu for testing: tap the top-left corner of the title screen 5 times quickly to open. Allows jumping directly to any round (1-15) with the correct theme loaded.
+
 ## Project Structure
 
 ```
@@ -109,7 +118,9 @@ eggthony/
     eggthony.png      # Player sprite
     metal_eggthony.png# Metal powerup variant
     muscle_eggthony.png# Muscle powerup variant
-    evil_eggthony.png # Boss sprite
+    evil_eggthony.png # Boss sprite (rounds 3, 6)
+    evil_eggthony_2.png # Boss sprite variant
+    quentin_pizza.png # QP boss sprite (rounds 9+)
     grunt.PNG         # Grunt enemy sprite
     brute.PNG         # Brute enemy sprite
     spitter.PNG       # Spitter enemy sprite
