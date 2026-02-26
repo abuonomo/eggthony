@@ -1514,6 +1514,7 @@ function updateBoss(dt) {
             player.iframes = IFRAME_DURATION;
             player.vx = knockDir * 400;
             player.vy = -250;
+            player.airJumps = 1; // reset air jump so player can escape knockback
             player.flashTimer = 0.15;
             spawnDamageNumber(pcx, player.y, boss.damage, '#ff4444');
             addShake(6, 0.15);
@@ -1606,6 +1607,7 @@ function updateBoss(dt) {
         player.iframes = IFRAME_DURATION;
         player.vx = knockDir * CONTACT_KNOCKBACK;
         player.vy = -200;
+        player.airJumps = 1; // reset air jump so player can escape knockback
         player.flashTimer = 0.15;
         spawnDamageNumber(pcx, player.y, boss.damage, '#ff4444');
         addShake(6, 0.15);
@@ -3867,6 +3869,7 @@ function updateEnemies(dt) {
           player.iframes = IFRAME_DURATION;
           player.vx = knockDir * CONTACT_KNOCKBACK;
           player.vy = -200;
+          player.airJumps = 1; // reset air jump so player can escape knockback
           player.flashTimer = 0.15;
           spawnDamageNumber(player.x + PLAYER_W / 2, player.y, e.damage, '#ff4444');
           addShake(6, 0.15);
