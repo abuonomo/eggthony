@@ -53,6 +53,12 @@ Eggthony: Lightning Egg — single-file HTML5 Canvas arena brawler. All game cod
 - **Enemy types:** grunt (basic), spitter (ranged), brute (charging). Type determined at spawn by round-based probability.
 - **State resets:** Game restart clears state in TWO click handlers (title and gameOver) plus `startRound()`. All three must stay in sync.
 
+## Workspace & Repo Structure
+- The git repo is `eggthony/` — NOT the parent `eggthony-workspace/` directory
+- `eggthony-workspace/` is just a working directory that contains the repo and other workspace files (e.g. `.claude/`)
+- The only branch is `main`. Do not create or use `master`
+- All git commands (commit, push, etc.) should run inside `eggthony/`
+
 ## Adding New Features
 - New sounds: add case to `playSound()` switch (~line 88)
 - New enemies: add to `spawnEnemyForRound()` and `updateEnemies()`/`drawEnemies()`

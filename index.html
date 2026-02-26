@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Eggthony: Lightning Egg</title>
+<meta name="description" content="Arena brawler starring a lightning-wielding egg. Zap enemies, launch snot rockets, and fight bosses.">
+
+<!-- Open Graph (iMessage, Facebook, etc.) -->
+<meta property="og:title" content="Eggthony: Lightning Egg">
+<meta property="og:description" content="Arena brawler starring a lightning-wielding egg. Zap enemies, launch snot rockets, and fight bosses.">
+<meta property="og:image" content="https://eggthony.com/data/eggthony_banner.png">
+<meta property="og:url" content="https://eggthony.com">
+<meta property="og:type" content="website">
+
+<!-- Twitter/X -->
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="Eggthony: Lightning Egg">
+<meta name="twitter:description" content="Arena brawler starring a lightning-wielding egg. Zap enemies, launch snot rockets, and fight bosses.">
+<meta name="twitter:image" content="https://eggthony.com/data/eggthony_banner.png">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
@@ -245,6 +259,12 @@ snotSniffleClip.preload = 'auto';
 snotSniffleClip.loop = true;
 const snotLaunchClip = new Audio(encodeURI('data/sounds/Snot rocket launch.m4a'));
 snotLaunchClip.preload = 'auto';
+
+// Background music
+const musicClip = new Audio(encodeURI('data/sounds/music.m4a'));
+musicClip.preload = 'auto';
+musicClip.loop = true;
+musicClip.volume = 0.1;
 for (const [name, clip] of Object.entries(voiceClips)) {
   clip.preload = 'auto';
   clip.addEventListener('error', () => console.warn('Audio load failed:', name, clip.error));
@@ -293,6 +313,11 @@ const evilSprite = new Image();
 evilSprite.src = 'data/evil_eggthony.png';
 let evilSpriteLoaded = false;
 evilSprite.onload = () => { evilSpriteLoaded = true; };
+
+const evilSprite2 = new Image();
+evilSprite2.src = 'data/evil_eggthony_2.png';
+let evilSprite2Loaded = false;
+evilSprite2.onload = () => { evilSprite2Loaded = true; };
 
 // Strip white backgrounds from sprites and auto-crop to tight bounding box
 function removeWhiteBG(img, callback) {
@@ -883,6 +908,7 @@ function createBoss(r) {
     scoreValue: 1000 + (app - 1) * 500,
     speed: 100 + (app - 1) * 15,
     onPlatform: false,
+    appearance: app,
     facingRight: true,
     flashTimer: 0,
     dying: false,
@@ -1227,8 +1253,10 @@ function drawBoss() {
     }
   }
 
-  // Draw sprite
-  if (evilSpriteLoaded) {
+  // Draw sprite — use powered-up sprite for 2nd boss fight onward
+  const useSprite2 = boss.appearance >= 2 && evilSprite2Loaded;
+  const bossSprite = useSprite2 ? evilSprite2 : evilSprite;
+  if (useSprite2 || evilSpriteLoaded) {
     ctx.save();
     if (!boss.facingRight) {
       ctx.translate(bcx, bcy);
@@ -1236,7 +1264,7 @@ function drawBoss() {
       ctx.translate(-bcx, -bcy);
     }
 
-    ctx.drawImage(evilSprite, boss.x, boss.y, boss.w, boss.h);
+    ctx.drawImage(bossSprite, boss.x, boss.y, boss.w, boss.h);
 
     if (boss.flashTimer > 0) {
       ctx.globalCompositeOperation = 'source-atop';
@@ -3562,7 +3590,7 @@ function drawTitleScreen() {
       'HOLD Q/E - Aim snot mortar, release to fire!',
     ])
   ];
-  const ctrlY = cy + 350;
+  const ctrlY = cy + 470;
   controls.forEach((line, i) => {
     ctx.fillText(line, W / 2, ctrlY + i * 24);
   });
@@ -3650,6 +3678,8 @@ canvas.addEventListener('click', () => {
   if (gameState === 'title') {
     gameState = 'playing';
     playVoice('start', true);
+    musicClip.currentTime = 0;
+    musicClip.play().catch(() => {});
     score = 0;
     round = 1;
     enemies = [];
@@ -3680,6 +3710,8 @@ canvas.addEventListener('click', () => {
     startRound(1);
   } else if (gameState === 'gameOver' && gameOverCooldown <= 0) {
     gameState = 'playing';
+    musicClip.currentTime = 0;
+    musicClip.play().catch(() => {});
     score = 0;
     round = 1;
     enemies = [];
@@ -3788,6 +3820,7 @@ function update(dt) {
     if (player.hp <= 0) {
       gameState = 'gameOver';
       gameOverCooldown = 1.5;
+      musicClip.pause();
       spawnParticles(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, '#f5e6c8', 30, 300, 1.0);
       addShake(12, 0.4);
       playSound('gameOver');
