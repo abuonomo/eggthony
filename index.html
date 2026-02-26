@@ -461,6 +461,7 @@ let dwyerSprite = null, dwyerSpriteLoaded = false;
 let chestplateSprite = null, chestplateSpriteLoaded = false;
 let swordSprite = null, swordSpriteLoaded = false;
 let quentinPizzaSprite = null, quentinPizzaSpriteLoaded = false;
+let snotCageSprite = null, snotCageSpriteLoaded = false;
 
 const spriteFiles = [
   ['data/grunt.png',           (s) => { gruntSprite = s; gruntSpriteLoaded = true; }],
@@ -472,6 +473,7 @@ const spriteFiles = [
   ['data/chesplate.png',       (s) => { chestplateSprite = s; chestplateSpriteLoaded = true; }],
   ['data/sword.png',           (s) => { swordSprite = s; swordSpriteLoaded = true; }],
   ['data/quentin_pizza.png',   (s) => { quentinPizzaSprite = s; quentinPizzaSpriteLoaded = true; }],
+  ['data/snot_cage.png',       (s) => { snotCageSprite = s; snotCageSpriteLoaded = true; }],
 ];
 for (const [src, cb] of spriteFiles) {
   const raw = new Image();
@@ -3742,8 +3744,8 @@ function updateEnemies(dt) {
     if (e.x < PLATFORM_X) { e.x = PLATFORM_X; }
     if (e.x + e.w > PLATFORM_X + PLATFORM_W) { e.x = PLATFORM_X + PLATFORM_W - e.w; }
 
-    // Contact damage to player
-    if (player.iframes <= 0 && !e.dying) {
+    // Contact damage to player (frozen enemies deal no damage)
+    if (player.iframes <= 0 && !e.dying && e.freezeTimer <= 0) {
       if (rectsOverlap(player.x, player.y, PLAYER_W, PLAYER_H, e.x, e.y, e.w, e.h)) {
         if (player.metalTimer > 0) {
           // Metal mode: bounce enemies away instead
@@ -3844,6 +3846,53 @@ function drawEnemies() {
     const cx = e.x + e.w / 2;
     const cy = e.y + e.h / 2;
 
+    // Frozen enemies: replace with snot cage sprite
+    if (e.freezeTimer > 0 && !e.dying && snotCageSpriteLoaded) {
+      const cageSpr = snotCageSprite;
+      const ratio = cageSpr.naturalWidth / cageSpr.naturalHeight;
+      const drawH = e.h + 24;
+      const drawW = drawH * ratio;
+      const drawX = cx - drawW / 2;
+      const feetY = e.onPlatform ? PLATFORM_Y : e.y + e.h;
+      const drawY = feetY - drawH;
+
+      if (e.flashTimer > 0) {
+        const fw = Math.ceil(drawW);
+        const fh = Math.ceil(drawH);
+        if (flashCanvas.width < fw) flashCanvas.width = fw;
+        if (flashCanvas.height < fh) flashCanvas.height = fh;
+        flashCtx.clearRect(0, 0, flashCanvas.width, flashCanvas.height);
+        flashCtx.globalCompositeOperation = 'source-over';
+        flashCtx.drawImage(cageSpr, 0, 0, fw, fh);
+        flashCtx.globalCompositeOperation = 'source-atop';
+        flashCtx.fillStyle = `rgba(255,255,255,${e.flashTimer * 5})`;
+        flashCtx.fillRect(0, 0, fw, fh);
+        ctx.drawImage(flashCanvas, 0, 0, fw, fh, drawX, drawY, drawW, drawH);
+      } else {
+        ctx.drawImage(cageSpr, drawX, drawY, drawW, drawH);
+      }
+
+      // HP bar
+      if (e.hp < e.maxHp) {
+        const barW = e.w;
+        const barH = 4;
+        ctx.fillStyle = '#440000';
+        ctx.fillRect(e.x, e.y - 8, barW, barH);
+        ctx.fillStyle = '#ff2222';
+        ctx.fillRect(e.x, e.y - 8, barW * (e.hp / e.maxHp), barH);
+      }
+      // Stomp target arrow
+      const arrowBob = Math.sin(performance.now() * 0.008) * 4;
+      const arrowY = e.y - 14 + arrowBob;
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center';
+      ctx.fillText('\u25BC', cx, arrowY);
+
+      ctx.globalAlpha = 1;
+      continue;
+    }
+
     const spr = getEnemySprite(e.type);
     if (spr) {
       // --- Sprite-based drawing ---
@@ -3927,34 +3976,6 @@ function drawEnemies() {
         ctx.beginPath();
         ctx.arc(cx, cy, e.w * 0.7, 0, Math.PI * 2);
         ctx.fill();
-      }
-
-      // Freeze visual
-      if (e.freezeTimer > 0) {
-        // Bright snot encasement (distinct from grunt green)
-        const pulse = 0.45 + 0.15 * Math.sin(performance.now() * 0.006);
-        ctx.fillStyle = `rgba(200,255,0,${pulse})`;
-        ctx.beginPath();
-        ctx.ellipse(cx, cy + e.h * 0.1, e.w / 2 + 4, e.h / 2 + 4, 0, 0, Math.PI * 2);
-        ctx.fill();
-        // Animated snot drips
-        const dripPhase = performance.now() * 0.003;
-        ctx.fillStyle = '#bbee22';
-        for (let b = 0; b < 4; b++) {
-          const bx = cx + (b - 1.5) * e.w * 0.25;
-          const dripY = Math.sin(dripPhase + b * 1.3) * 4;
-          const by = cy + e.h * 0.3 + dripY;
-          ctx.beginPath();
-          ctx.ellipse(bx, by, 4, 5 + dripY * 0.5, 0, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        // Stomp target arrow (bouncing ▼ above head)
-        const arrowBob = Math.sin(performance.now() * 0.008) * 4;
-        const arrowY = e.y - 14 + arrowBob;
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 14px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText('\u25BC', cx, arrowY);
       }
     }
 
