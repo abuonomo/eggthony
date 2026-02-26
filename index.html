@@ -37,7 +37,7 @@ body {
 canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
-  cursor: crosshair;
+  cursor: none;
   touch-action: none;
   /* filled dynamically by JS */
 }
@@ -66,13 +66,28 @@ canvas {
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
-// Dynamic sizing: fill viewport, pick internal resolution to match aspect ratio
+// Dynamic sizing: maintain portrait aspect ratio, letterbox on wide screens
 function resizeCanvas() {
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  canvas.style.width = vw + 'px';
-  canvas.style.height = vh + 'px';
+  const gameAspect = W_ASPECT / H_ASPECT;
+  const screenAspect = vw / vh;
+
+  let cw, ch;
+  if (screenAspect > gameAspect) {
+    // Screen is wider than game — fit to height, constrain width
+    ch = vh;
+    cw = Math.floor(vh * gameAspect);
+  } else {
+    // Screen is taller or same — fit to width
+    cw = vw;
+    ch = Math.floor(vw / gameAspect);
+  }
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
 }
+// Aspect ratio constants (used before W/H are defined)
+const W_ASPECT = 480, H_ASPECT = 854;
 resizeCanvas();
 window.addEventListener('resize', resizeCanvas);
 
@@ -510,6 +525,7 @@ window.addEventListener('keydown', e => {
     if (e.key === 'Escape') { skipLeaderboardInput(); }
     return;
   }
+  if (e.repeat) return; // ignore OS key repeat — breaks jump edge detection
   keys[e.key.toLowerCase()] = true;
   if (e.key === 'Escape') {
     if (gameState === 'playing') { gameState = 'paused'; }
@@ -532,6 +548,7 @@ window.addEventListener('keyup', e => {
   // Snot rocket release-to-fire (Q or E)
   const k = e.key.toLowerCase();
   if ((k === 'q' || k === 'e') && player.snotHolding) {
+    autoAimMouse();
     const chargeRatio = Math.min(player.snotChargeTime / SNOT_MAX_CHARGE, 1);
     player.snotHolding = false;
     player.snotChargeTime = 0;
@@ -551,12 +568,60 @@ canvas.addEventListener('mousemove', e => {
 canvas.addEventListener('mousedown', e => {
   ensureAudio();
   if (e.button === 0) mouse.left = true;
-  if (e.button === 2) mouse.right = true;
+  // Right-click (two-finger click on Mac) = snot rocket charge
+  if (e.button === 2) {
+    mouse.right = true;
+    if (gameState === 'playing' && player.snotCooldown <= 0 && !player.snotHolding && !snotRocket) {
+      player.snotHolding = true;
+      player.snotChargeTime = 0;
+      snotSniffleClip.currentTime = 0;
+      snotSniffleClip.play().catch(() => {});
+    }
+  }
 });
 canvas.addEventListener('mouseup', e => {
   if (e.button === 0) mouse.left = false;
-  if (e.button === 2) mouse.right = false;
+  // Right-click release = fire snot rocket
+  if (e.button === 2) {
+    mouse.right = false;
+    if (player.snotHolding) {
+      autoAimMouse();
+      const chargeRatio = Math.min(player.snotChargeTime / SNOT_MAX_CHARGE, 1);
+      player.snotHolding = false;
+      player.snotChargeTime = 0;
+      snotSniffleClip.pause();
+      snotSniffleClip.currentTime = 0;
+      snotLaunchClip.currentTime = 0;
+      snotLaunchClip.play().catch(() => {});
+      fireSnotRocket(chargeRatio);
+      player.snotCooldown = SNOT_COOLDOWN;
+    }
+  }
 });
+
+// Auto-aim: snap mouse to nearest enemy/boss (used by both mobile and desktop)
+function autoAimMouse() {
+  const pcx = player.x + PLAYER_W / 2;
+  const pcy = player.y + PLAYER_H / 2;
+  let nearest = null, nearDist = Infinity;
+  for (const en of enemies) {
+    if (en.dying) continue;
+    const d = Math.hypot(en.x + en.w / 2 - pcx, en.y + en.h / 2 - pcy);
+    if (d < nearDist) { nearDist = d; nearest = en; }
+  }
+  // Include boss as target
+  if (boss && bossActive && !boss.dying) {
+    const d = Math.hypot(boss.x + boss.w / 2 - pcx, boss.y + boss.h / 2 - pcy);
+    if (d < nearDist) { nearDist = d; nearest = boss; }
+  }
+  if (nearest) {
+    mouse.x = nearest.x + nearest.w / 2;
+    mouse.y = nearest.y + nearest.h / 2;
+  } else {
+    mouse.x = player.facingRight ? pcx + 200 : pcx - 200;
+    mouse.y = pcy;
+  }
+}
 
 // Mobile touch controls
 const isMobile = 'ontouchstart' in window;
@@ -585,29 +650,6 @@ if (isMobile) {
   const ZAP_BTN = { x: W - 70, y: H - 80, r: 44 };
   const SNOT_BTN = { x: W - 160, y: H - 80, r: 36 };
   const JUMP_BTN = { x: W - 70, y: H - 185, r: 38 };
-
-  function autoAimMouse() {
-    const pcx = player.x + PLAYER_W / 2;
-    const pcy = player.y + PLAYER_H / 2;
-    let nearest = null, nearDist = Infinity;
-    for (const en of enemies) {
-      if (en.dying) continue;
-      const d = Math.hypot(en.x + en.w / 2 - pcx, en.y + en.h / 2 - pcy);
-      if (d < nearDist) { nearDist = d; nearest = en; }
-    }
-    // Include boss as target
-    if (boss && bossActive && !boss.dying) {
-      const d = Math.hypot(boss.x + boss.w / 2 - pcx, boss.y + boss.h / 2 - pcy);
-      if (d < nearDist) { nearDist = d; nearest = boss; }
-    }
-    if (nearest) {
-      mouse.x = nearest.x + nearest.w / 2;
-      mouse.y = nearest.y + nearest.h / 2;
-    } else {
-      mouse.x = player.facingRight ? pcx + 200 : pcx - 200;
-      mouse.y = pcy;
-    }
-  }
 
   // Convert screen touch coords to canvas coords
   function touchToCanvas(touch) {
@@ -2454,7 +2496,7 @@ function updatePlayer(dt) {
     player.onGround = false;
   } else {
     // Jump (SSBM-style double jump)
-    const jumpInput = keys['w'] || keys['arrowup'] || keys[' '];
+    const jumpInput = keys[' '] || keys['arrowup'];
     const jumpMult = player.muscleTimer > 0 ? 1.5 : 1;
     if (jumpInput && !player.jumpHeld) {
       if (player.onGround) {
@@ -2580,15 +2622,17 @@ function updatePlayer(dt) {
     }
   }
 
-  // Attack: poop dropper while flying, lightning otherwise
+  // Attack: poop dropper while flying, lightning otherwise (left click only)
   if (player.wingsTimer > 0) {
-    if ((mouse.left || mouse.right) && player.poopCooldown <= 0) {
+    if (mouse.left && player.poopCooldown <= 0) {
+      autoAimMouse();
       player.poopCooldown = POOP_COOLDOWN;
       firePoopBomb();
     }
   } else {
-    // Lightning attack (left click or right click)
-    if ((mouse.left || mouse.right) && player.lightningCooldown <= 0) {
+    // Lightning attack (left click only — right click is snot rocket)
+    if (mouse.left && player.lightningCooldown <= 0) {
+      autoAimMouse();
       player.lightningCooldown = LIGHTNING_COOLDOWN;
       fireLightning();
     }
