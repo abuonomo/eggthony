@@ -725,7 +725,7 @@ if (isMobile) {
       // Check JUMP button
       if (jumpTouch === null && inCircle(c.x, c.y, JUMP_BTN.x, JUMP_BTN.y, JUMP_BTN.r + 10)) {
         jumpTouch = touch.identifier;
-        keys['w'] = true;
+        keys[' '] = true;
         continue;
       }
 
@@ -769,7 +769,7 @@ if (isMobile) {
         attackTouch = null;
       }
       if (touch.identifier === jumpTouch) {
-        keys['w'] = false;
+        keys[' '] = false;
         jumpTouch = null;
       }
       if (touch.identifier === snotTouch) {
@@ -935,8 +935,8 @@ const GRAVITY = 1400;
 const PLAYER_SPEED = 260;
 const JUMP_FORCE = -560;
 const PLATFORM_Y = 520;
-const PLATFORM_X = 20;
-const PLATFORM_W = W - 40;
+const PLATFORM_X = 0;
+const PLATFORM_W = W;
 const PLATFORM_H = 24;
 const PLAYER_W = 56;
 const PLAYER_H = 128;
