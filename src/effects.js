@@ -149,6 +149,28 @@ export function updateCampSpider(dt) {
       player.vy = 0;
       player.onGround = false;
 
+      // Mash ZAP to escape
+      if (S.mouse.left && !S._zapHeld) {
+        sp.zapHits++;
+        S._zapHeld = true;
+        spawnParticles(sp.x, sp.y, '#ffffff', 5, 80, 0.4);
+        playSound('lightning');
+        if (sp.zapHits >= CAMP_SPIDER_ZAPS_TO_ESCAPE) {
+          // Escape!
+          sp.state = 'retreating';
+          S.campTimer = 0;
+          if (player.y > SPIDER_DROP_CLUTCH_Y) {
+            // Normal escape
+            player.vy = -300;
+          } else {
+            // Clutch escape — reward with Spider Drop!
+            spiderDropReward();
+          }
+        }
+      } else if (!S.mouse.left) {
+        S._zapHeld = false;
+      }
+
       if (player.y < -PLAYER_H - 20) {
         player.hp = 0;
         S.campSpider = null;
@@ -218,4 +240,18 @@ export function drawCampSpider() {
   }
 
   ctx.restore();
+}
+
+// ============================================================
+// SPIDER DROP REWARD ACTIVATION
+// ============================================================
+export function spiderDropReward() {
+  const { player } = S;
+  player.spiderDropTimer = SPIDER_DROP_DURATION;
+  player.y = SPIDER_DROP_Y;
+  player.vy = 0;
+  player.onGround = false;
+  spawnParticles(player.x + PLAYER_W / 2, player.y, '#ff44ff', 20, 250, 0.6);
+  addShake(10, 0.25);
+  playSound('powerup');
 }

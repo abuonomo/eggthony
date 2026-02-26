@@ -41,6 +41,7 @@ export const S = {
   // Input
   keys: {},
   mouse: { x: W / 2, y: H / 2, left: false, right: false },
+  _zapHeld: false,
 
   // Screen shake
   shakeX: 0,

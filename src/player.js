@@ -6,7 +6,8 @@ import {
   PLAYER_W, PLAYER_H,
   SNOT_COOLDOWN, SNOT_MAX_CHARGE,
   WINGS_FLY_Y, WINGS_RISE_SPEED,
-  SPIDER_DROP_Y,
+  SPIDER_DROP_Y, LIGHTNING_COOLDOWN,
+  POOP_COOLDOWN,
 } from './constants.js';
 import {
   eggSprite, spriteLoaded,
@@ -16,12 +17,32 @@ import {
 } from './sprites.js';
 import { spawnParticles } from './effects.js';
 import { playSound } from './audio.js';
+import { fireLightning, firePoopBomb } from './weapons.js';
+import { autoAimMouse } from './input.js';
 
 // ============================================================
 // PLAYER UPDATE (physics, movement, jumping, collisions, timers)
 // ============================================================
 export function updatePlayer(dt) {
   const { player, keys, mouse, floatingPlatforms, particles } = S;
+
+  // Attack: poop dropper while flying, lightning otherwise (left click only)
+  if (S.gameState === 'playing' && player.hp > 0 && mouse.left) {
+    if (player.wingsTimer > 0) {
+      if (player.poopCooldown <= 0) {
+        autoAimMouse();
+        player.poopCooldown = POOP_COOLDOWN;
+        firePoopBomb();
+      }
+    } else if (!S.campSpider || S.campSpider.state !== 'grabbed') {
+      if (player.lightningCooldown <= 0) {
+        autoAimMouse();
+        const fireRateMult = player.spiderDropTimer > 0 ? 3 : 1;
+        player.lightningCooldown = LIGHTNING_COOLDOWN / fireRateMult;
+        fireLightning();
+      }
+    }
+  }
 
   // Movement
   let moveX = 0;
