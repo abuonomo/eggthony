@@ -4,6 +4,20 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
 <title>Eggthony: Lightning Egg</title>
+<meta name="description" content="Arena brawler starring a lightning-wielding egg. Zap enemies, launch snot rockets, and fight bosses.">
+
+<!-- Open Graph (iMessage, Facebook, etc.) -->
+<meta property="og:title" content="Eggthony: Lightning Egg">
+<meta property="og:description" content="Arena brawler starring a lightning-wielding egg. Zap enemies, launch snot rockets, and fight bosses.">
+<meta property="og:image" content="https://eggthony.com/data/eggthony_banner.jpg">
+<meta property="og:url" content="https://eggthony.com">
+<meta property="og:type" content="website">
+
+<!-- Twitter/X -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Eggthony: Lightning Egg">
+<meta name="twitter:description" content="Arena brawler starring a lightning-wielding egg. Zap enemies, launch snot rockets, and fight bosses.">
+<meta name="twitter:image" content="https://eggthony.com/data/eggthony_banner.jpg">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body {
@@ -34,6 +48,17 @@ canvas {
 </head>
 <body>
 <canvas id="game"></canvas>
+<div id="nameOverlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:10; pointer-events:none;">
+  <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:rgba(0,0,0,0.92); border:2px solid #ffcc00; border-radius:8px; padding:20px 24px; text-align:center; pointer-events:auto; font-family:monospace;">
+    <div style="color:#ffcc00; font-size:18px; font-weight:bold; margin-bottom:12px;">ENTER YOUR NAME</div>
+    <input id="nameInput" type="text" maxlength="16" autocomplete="off" spellcheck="false"
+      style="background:#111; color:#fff; border:1px solid #ffcc00; font-family:monospace; font-size:18px; padding:8px 12px; width:200px; text-align:center; outline:none; border-radius:4px;">
+    <div style="margin-top:14px; display:flex; gap:12px; justify-content:center;">
+      <button id="nameSubmit" style="background:#ffcc00; color:#000; border:none; font-family:monospace; font-size:16px; font-weight:bold; padding:8px 20px; cursor:pointer; border-radius:4px;">SUBMIT</button>
+      <button id="nameSkip" style="background:none; color:#888; border:1px solid #555; font-family:monospace; font-size:14px; padding:8px 16px; cursor:pointer; border-radius:4px;">Skip</button>
+    </div>
+  </div>
+</div>
 <script>
 // ============================================================
 // EGGTHONY: LIGHTNING EGG
@@ -71,8 +96,9 @@ function ensureAudio() {
   // Unlock HTML Audio elements on first interaction (autoplay policy)
   if (!audioUnlocked) {
     audioUnlocked = true;
-    for (const clip of [...Object.values(voiceClips), snotSniffleClip, snotLaunchClip, quentinFartClip]) {
-      clip.play().then(() => { clip.pause(); clip.currentTime = 0; }).catch(() => {});
+    // Touch the clips to unlock them for autoplay policy (load without playing)
+    for (const clip of [...Object.values(voiceClips), snotSniffleClip, snotLaunchClip, quentinFartClip, dwyerClip]) {
+      clip.load();
     }
   }
 }
@@ -209,6 +235,31 @@ function playSound(type) {
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
       osc.start(t); osc.stop(t + 0.2);
       break;
+    case 'poopDrop':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(400, t);
+      osc.frequency.exponentialRampToValueAtTime(150, t + 0.2);
+      gain.gain.setValueAtTime(0.12, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+      osc.start(t); osc.stop(t + 0.2);
+      break;
+    case 'poopSplat':
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(120, t);
+      osc.frequency.exponentialRampToValueAtTime(40, t + 0.25);
+      gain.gain.setValueAtTime(0.2, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      osc.start(t); osc.stop(t + 0.25);
+      break;
+    case 'wingsPickup':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(500, t);
+      osc.frequency.exponentialRampToValueAtTime(900, t + 0.15);
+      osc.frequency.exponentialRampToValueAtTime(1200, t + 0.3);
+      gain.gain.setValueAtTime(0.15, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+      osc.start(t); osc.stop(t + 0.3);
+      break;
   }
 }
 
@@ -238,7 +289,8 @@ const voiceClips = {
   good2: new Audio(encodeURI('data/sounds/Good - hammanado.m4a')),
   lose: new Audio(encodeURI('data/sounds/Lose - eh maybe next time.m4a')),
   win: new Audio(encodeURI('data/sounds/Win \u2014 let\u2019s freaking go boys.m4a')),
-  start: new Audio(encodeURI('data/sounds/Start game trimmed.m4a'))
+  start: new Audio(encodeURI('data/sounds/Start game trimmed.m4a')),
+  boss: new Audio(encodeURI('data/sounds/Boss_eat_trimmed.m4a'))
 };
 const snotSniffleClip = new Audio(encodeURI('data/sounds/Snot rocket sniffle.m4a'));
 snotSniffleClip.preload = 'auto';
@@ -247,10 +299,26 @@ const snotLaunchClip = new Audio(encodeURI('data/sounds/Snot rocket launch.m4a')
 snotLaunchClip.preload = 'auto';
 const quentinFartClip = new Audio(encodeURI('data/sounds/quentin_fart_trimmed.m4a'));
 quentinFartClip.preload = 'auto';
+
+// Dwyer entrance sound
+const dwyerClip = new Audio(encodeURI('data/sounds/dwyer.m4a'));
+dwyerClip.preload = 'auto';
+
+// Background music
+const musicClip = new Audio(encodeURI('data/sounds/music.m4a'));
+musicClip.preload = 'auto';
+musicClip.loop = true;
+musicClip.volume = 0.1;
 for (const [name, clip] of Object.entries(voiceClips)) {
   clip.preload = 'auto';
   clip.addEventListener('error', () => console.warn('Audio load failed:', name, clip.error));
 }
+// Pre-fetch start clip as ArrayBuffer for instant Web Audio playback
+let startClipBuffer = null;
+fetch(encodeURI('data/sounds/Start game trimmed.m4a'))
+  .then(r => r.arrayBuffer())
+  .then(buf => { startClipBuffer = buf; })
+  .catch(() => {});
 let lowHpTriggered = false;
 let goodClipToggle = false;
 let activeVoice = null;
@@ -266,6 +334,20 @@ function playVoice(name, force) {
     activeVoice.pause();
     activeVoice.currentTime = 0;
   }
+
+  // Use pre-decoded Web Audio buffer for start clip (instant playback)
+  if (name === 'start' && startClipBuffer && audioCtx) {
+    audioCtx.decodeAudioData(startClipBuffer.slice(0), (decoded) => {
+      const source = audioCtx.createBufferSource();
+      source.buffer = decoded;
+      source.connect(audioCtx.destination);
+      source.start(0);
+    }, () => {});
+    startClipBuffer = null; // only use once, then fall back to normal
+    activeVoice = voiceClips[name]; // track it for isVoicePlaying
+    return;
+  }
+
   const clip = voiceClips[name];
   if (!clip) return;
   clip.currentTime = 0;
@@ -352,21 +434,69 @@ let spitterSprite = null, spitterSpriteLoaded = false;
 let bruteSprite = null, bruteSpriteLoaded = false;
 let metalHatSprite = null, metalHatSpriteLoaded = false;
 let smoothieSprite = null, smoothieSpriteLoaded = false;
+let dwyerSprite = null, dwyerSpriteLoaded = false;
+let chestplateSprite = null, chestplateSpriteLoaded = false;
+let swordSprite = null, swordSpriteLoaded = false;
 let quentinPizzaSprite = null, quentinPizzaSpriteLoaded = false;
 
 const spriteFiles = [
-  ['data/grunt.png',     (s) => { gruntSprite = s; gruntSpriteLoaded = true; }],
-  ['data/spitter.png',   (s) => { spitterSprite = s; spitterSpriteLoaded = true; }],
-  ['data/brute.png',     (s) => { bruteSprite = s; bruteSpriteLoaded = true; }],
-  ['data/metal_hat.png', (s) => { metalHatSprite = s; metalHatSpriteLoaded = true; }],
-  ['data/smoothie.png',  (s) => { smoothieSprite = s; smoothieSpriteLoaded = true; }],
-  ['data/quentin_pizza.png', (s) => { quentinPizzaSprite = s; quentinPizzaSpriteLoaded = true; }],
+  ['data/grunt.png',           (s) => { gruntSprite = s; gruntSpriteLoaded = true; }],
+  ['data/spitter.png',         (s) => { spitterSprite = s; spitterSpriteLoaded = true; }],
+  ['data/brute.png',           (s) => { bruteSprite = s; bruteSpriteLoaded = true; }],
+  ['data/metal_hat.png',       (s) => { metalHatSprite = s; metalHatSpriteLoaded = true; }],
+  ['data/smoothie.png',        (s) => { smoothieSprite = s; smoothieSpriteLoaded = true; }],
+  ['data/dwyer_soldier.png',   (s) => { dwyerSprite = s; dwyerSpriteLoaded = true; }],
+  ['data/chesplate.png',       (s) => { chestplateSprite = s; chestplateSpriteLoaded = true; }],
+  ['data/sword.png',           (s) => { swordSprite = s; swordSpriteLoaded = true; }],
+  ['data/quentin_pizza.png',   (s) => { quentinPizzaSprite = s; quentinPizzaSpriteLoaded = true; }],
 ];
 for (const [src, cb] of spriteFiles) {
   const raw = new Image();
   raw.onload = () => removeWhiteBG(raw, cb);
   raw.src = src;
 }
+
+let wingsSprite = null;
+let wingsSpriteLoaded = false;
+{
+  const raw = new Image();
+  raw.onload = () => removeWhiteBG(raw, (s) => { wingsSprite = s; wingsSpriteLoaded = true; });
+  raw.src = 'data/eggthony_wings.png';
+}
+
+let wingsPowerupSprite = null, wingsPowerupSpriteLoaded = false;
+{
+  const raw = new Image();
+  raw.onload = () => removeWhiteBG(raw, (s) => { wingsPowerupSprite = s; wingsPowerupSpriteLoaded = true; });
+  raw.src = 'data/wings_powerup.png';
+}
+
+// ============================================================
+// LEADERBOARD API
+// ============================================================
+const LEADERBOARD_API = 'https://eggthony-leaderboard.eggthony.workers.dev';
+let leaderboardData = [];
+let leaderboardInputActive = false; // suppresses game keyboard input when true
+
+async function fetchLeaderboard() {
+  try {
+    const res = await fetch(LEADERBOARD_API + '/scores');
+    if (res.ok) leaderboardData = await res.json();
+  } catch {}
+}
+
+async function submitScore(name, score, round) {
+  try {
+    const res = await fetch(LEADERBOARD_API + '/scores', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, score, round }),
+    });
+    if (res.ok) leaderboardData = await res.json();
+  } catch {}
+}
+
+fetchLeaderboard();
 
 // ============================================================
 // INPUT
@@ -376,6 +506,10 @@ const mouse = { x: W / 2, y: H / 2, left: false, right: false };
 
 window.addEventListener('keydown', e => {
   ensureAudio();
+  if (leaderboardInputActive) {
+    if (e.key === 'Escape') { skipLeaderboardInput(); }
+    return;
+  }
   keys[e.key.toLowerCase()] = true;
   if (e.key === 'Escape') {
     if (gameState === 'playing') { gameState = 'paused'; }
@@ -393,6 +527,7 @@ window.addEventListener('keydown', e => {
   }
 });
 window.addEventListener('keyup', e => {
+  if (leaderboardInputActive) return;
   keys[e.key.toLowerCase()] = false;
   // Snot rocket release-to-fire (Q or E)
   const k = e.key.toLowerCase();
@@ -493,7 +628,7 @@ if (isMobile) {
 
     if (gameState === 'title') {
       const tc = touchToCanvas(e.changedTouches[0]);
-      // Dev menu open: forward to click handler for hit testing
+      // Dev menu open: forward to click handler with coordinates
       if (devMenuOpen) {
         const synth = new MouseEvent('click', {
           clientX: e.changedTouches[0].clientX,
@@ -505,14 +640,14 @@ if (isMobile) {
       // Secret tap zone: top-left corner
       if (tc.x < 80 && tc.y < 80) {
         devTapCount++;
-        devTapTimer = 2.0;
+        devTapTimer = 1.0;
         if (devTapCount >= 5) {
           devMenuOpen = true;
           devTapCount = 0;
         }
-        return; // don't start game
+        return;
       }
-      // Normal tap: start game via click handler
+      // Normal tap: start game
       canvas.dispatchEvent(new Event('click'));
       return;
     }
@@ -789,6 +924,26 @@ const LIGHTNING_SPEED = 700;
 const LIGHTNING_DAMAGE = 15;
 const LIGHTNING_COOLDOWN = 0.12;
 
+const WINGS_DURATION = 8;
+const WINGS_SIZE = 40;
+const WINGS_FLY_Y = 80;
+const WINGS_RISE_SPEED = 400;
+const POOP_DAMAGE = 22;
+const POOP_AOE_RADIUS = 90;
+const POOP_COOLDOWN = 0.45;
+const POOP_SIZE = 12;
+const POOP_GRAVITY = 800;
+
+const DWYER_DURATION = 10;
+const CHESTPLATE_SIZE = 40;
+const DWYER_W = 90, DWYER_H = 130;
+const DWYER_SPEED = 240;
+const DWYER_ATTACK_RANGE = 70;
+const DWYER_ATTACK_DAMAGE = 18;
+const DWYER_ATTACK_COOLDOWN = 0.6;
+const DWYER_LANDING_AOE_RADIUS = 200;
+const DWYER_LANDING_DAMAGE = 35;
+
 const PLAYER_MAX_HP = 100;
 const IFRAME_DURATION = 0.8;
 const CONTACT_DAMAGE = 10;
@@ -868,15 +1023,59 @@ function getTheme() {
 let gameState = 'title'; // title, playing, paused, roundTransition, gameOver
 let score = 0;
 let round = 1;
-
-// Dev menu (hidden — tap top-left corner 5x on title screen)
-let devMenuOpen = false;
-let devTapCount = 0;
-let devTapTimer = 0;
 let roundTimer = 0;
 let transitionTimer = 0;
 let gameOverCooldown = 0;
+let gameOverPhase = 'waiting'; // waiting, input, submitted, showing
 let titleBlink = 0;
+let snotReadyFlash = 0;
+
+// Dev menu state
+let devMenuOpen = false;
+let devTapCount = 0;
+let devTapTimer = 0;
+
+// Name overlay elements & handlers
+const nameOverlay = document.getElementById('nameOverlay');
+const nameInput = document.getElementById('nameInput');
+const nameSubmit = document.getElementById('nameSubmit');
+const nameSkip = document.getElementById('nameSkip');
+
+function showNameInput() {
+  gameOverPhase = 'input';
+  leaderboardInputActive = true;
+  nameInput.value = localStorage.getItem('eggthonyName') || '';
+  nameOverlay.style.display = '';
+  setTimeout(() => nameInput.focus(), 50);
+}
+
+function hideNameInput() {
+  nameOverlay.style.display = 'none';
+  leaderboardInputActive = false;
+}
+
+async function handleNameSubmit() {
+  const name = nameInput.value.trim();
+  if (!name) { nameInput.focus(); return; }
+  localStorage.setItem('eggthonyName', name);
+  hideNameInput();
+  gameOverPhase = 'submitted';
+  await submitScore(name, score, round);
+  await fetchLeaderboard();
+  gameOverPhase = 'showing';
+}
+
+function skipLeaderboardInput() {
+  hideNameInput();
+  fetchLeaderboard();
+  gameOverPhase = 'showing';
+}
+
+nameSubmit.addEventListener('click', handleNameSubmit);
+nameSkip.addEventListener('click', skipLeaderboardInput);
+nameInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleNameSubmit();
+});
 
 // Screen shake
 let shakeX = 0, shakeY = 0, shakeDuration = 0, shakeIntensity = 0;
@@ -887,8 +1086,14 @@ function addShake(intensity, duration) {
 }
 
 // ============================================================
-// BOSS SYSTEM — EVIL EGGTHONY
+// BOSS SYSTEM — EVIL EGGTHONY / QUENTIN PIZZA
 // ============================================================
+const FART_CLOUD_RADIUS = 130;
+const FART_CLOUD_DURATION = 4;
+const FART_CLOUD_DPS = 12;
+const FART_CLOUD_TICK = 0.5;
+let fartClouds = [];
+
 let boss = null;
 let bossActive = false;
 let bossEntering = false;
@@ -906,17 +1111,14 @@ function bossAppearance(r) {
 function createBoss(r) {
   const app = bossAppearance(r);
   const isQP = app >= 3;
-  // QP resets scale growth — starts at 1.0 on first QP appearance
-  const qpApp = isQP ? app - 2 : app; // QP: app 3→1, 4→2, 5→3...
-  const scale = 1 + (qpApp - 1) * 0.15;
-  // QP sprite is square (1024x1024); evil_eggthony is taller (818x1164)
+  // QP resets scale: qpApp counts from 1 on first QP appearance
+  const qpApp = isQP ? app - 2 : app;
+  const scale = isQP ? 1 + (qpApp - 1) * 0.15 : 1 + (app - 1) * 0.2;
   const baseH = isQP ? 153 : 180;
-  const baseW = isQP ? 153 : Math.round(180 * (818 / 1164));
+  const baseW = isQP ? 153 : Math.round(180 * (818 / 1164)); // QP is square, evil egg uses aspect ratio
   const w = Math.round(baseW * scale);
   const h = Math.round(baseH * scale);
-  // QP: cap damage at 30, slower charge
-  const dmg = isQP ? Math.min(30, 20 + (qpApp - 1) * 5) : 20 + (app - 1) * 10;
-  const chSpd = isQP ? 320 + (qpApp - 1) * 20 : 350 + (app - 1) * 30;
+  const damage = isQP ? Math.min(30, 20 + (qpApp - 1) * 10) : 20 + (app - 1) * 10;
   return {
     x: W / 2 - w / 2,
     y: -h - 50,
@@ -925,17 +1127,18 @@ function createBoss(r) {
     vy: 0,
     hp: 300 + (app - 1) * 200,
     maxHp: 300 + (app - 1) * 200,
-    damage: dmg,
+    damage: damage,
     scoreValue: 1000 + (app - 1) * 500,
     speed: 100 + (app - 1) * 15,
     onPlatform: false,
+    appearance: app,
     facingRight: true,
     flashTimer: 0,
     dying: false,
     deathTimer: 0,
     state: 'entering',
     attackCooldown: 2.0,
-    chargeSpeed: chSpd,
+    chargeSpeed: isQP ? 320 + (qpApp - 1) * 20 : 350 + (app - 1) * 30,
     chargeTimer: 0,
     chargeDir: 1,
     poundTargetX: 0,
@@ -946,11 +1149,10 @@ function createBoss(r) {
     shockwaveRadius: 0,
     rage: false,
     animTimer: 0,
-    appearance: app,
-    freezeTimer: 0,
     isQuentinPizza: isQP,
     fartCooldown: 0,
-    fartTimer: 0
+    fartTimer: 0,
+    freezeTimer: 0
   };
 }
 
@@ -1017,7 +1219,7 @@ function updateBoss(dt) {
         spawnParticles(boss.x + boss.w / 2, PLATFORM_Y, '#ff6622', 20, 200, 0.5);
         playSound('bossSlam');
         playNoise(0.2, 0.25);
-        // QP: immediate fart on landing
+        // QP immediately farts on landing
         if (boss.isQuentinPizza) {
           boss.state = 'fart_windup';
           boss.fartTimer = 0.4;
@@ -1038,10 +1240,14 @@ function updateBoss(dt) {
       if (boss.x < PLATFORM_X) boss.x = PLATFORM_X;
       if (boss.x + boss.w > PLATFORM_X + PLATFORM_W) boss.x = PLATFORM_X + PLATFORM_W - boss.w;
 
+      // QP fart cooldown decay
+      if (boss.isQuentinPizza && boss.fartCooldown > 0) {
+        boss.fartCooldown -= dt;
+      }
+
       boss.attackCooldown -= dt;
-      if (boss.fartCooldown > 0) boss.fartCooldown -= dt;
       if (boss.attackCooldown <= 0) {
-        // QP fart attack: 35% chance if cooldown ready
+        // QP: chance to fart instead of normal attack
         if (boss.isQuentinPizza && boss.fartCooldown <= 0 && Math.random() < 0.35) {
           boss.state = 'fart_windup';
           boss.fartTimer = 0.8;
@@ -1135,7 +1341,7 @@ function updateBoss(dt) {
         playNoise(0.25, 0.2);
 
         const shockDist = Math.abs(pcx - (boss.x + boss.w / 2));
-        if (shockDist < 120 && player.iframes <= 0) {
+        if (shockDist < 120 && player.iframes <= 0 && player.wingsTimer <= 0) {
           if (player.metalTimer > 0) {
             const knockDir = Math.sign(pcx - (boss.x + boss.w / 2));
             player.vx = knockDir * 400;
@@ -1163,8 +1369,14 @@ function updateBoss(dt) {
       boss.poundTimer -= dt;
       boss.vx = 0;
       if (boss.poundTimer <= 0) {
-        boss.state = 'idle';
-        boss.attackCooldown = 2.0 * cooldownMult;
+        // QP farts after landing from pound
+        if (boss.isQuentinPizza && boss.fartCooldown <= 0) {
+          boss.state = 'fart_windup';
+          boss.fartTimer = 0.4;
+        } else {
+          boss.state = 'idle';
+          boss.attackCooldown = 2.0 * cooldownMult;
+        }
       }
       break;
     }
@@ -1178,16 +1390,20 @@ function updateBoss(dt) {
           x: boss.x + boss.w / 2,
           y: PLATFORM_Y - 10,
           radius: 0,
-          life: FART_CLOUD_DURATION,
-          tickTimer: FART_CLOUD_TICK
+          maxRadius: FART_CLOUD_RADIUS,
+          duration: FART_CLOUD_DURATION,
+          timer: FART_CLOUD_DURATION,
+          dps: FART_CLOUD_DPS,
+          tickTimer: 0,
+          expandTimer: 0.5
         });
         // Play fart sound
         quentinFartClip.currentTime = 0;
         quentinFartClip.play().catch(() => {});
-        // Particles burst
-        spawnParticles(boss.x + boss.w / 2, PLATFORM_Y - 20, '#66ff44', 20, 200, 0.5);
-        spawnParticles(boss.x + boss.w / 2, PLATFORM_Y - 20, '#88cc22', 15, 150, 0.4);
-        addShake(8, 0.25);
+        // Green particles
+        spawnParticles(boss.x + boss.w / 2, PLATFORM_Y - 20, '#66cc22', 20, 180, 0.5);
+        spawnParticles(boss.x + boss.w / 2, PLATFORM_Y - 20, '#88ff44', 10, 120, 0.4);
+        addShake(6, 0.2);
         boss.state = 'fart_release';
         boss.fartTimer = 0.4;
       }
@@ -1289,106 +1505,6 @@ function damageBoss(damage, knockX, knockY) {
   }
 }
 
-// ============================================================
-// FART CLOUD SYSTEM (Quentin Pizza boss)
-// ============================================================
-const FART_CLOUD_RADIUS = 130;
-const FART_CLOUD_DURATION = 4;
-const FART_CLOUD_DPS = 12;
-const FART_CLOUD_TICK = 0.5;
-
-let fartClouds = [];
-
-function updateFartClouds(dt) {
-  for (let i = fartClouds.length - 1; i >= 0; i--) {
-    const cloud = fartClouds[i];
-    cloud.life -= dt;
-    if (cloud.life <= 0) {
-      fartClouds.splice(i, 1);
-      continue;
-    }
-
-    // Expand during first 0.5s
-    const age = FART_CLOUD_DURATION - cloud.life;
-    if (age < 0.5) {
-      cloud.radius = FART_CLOUD_RADIUS * (age / 0.5);
-    } else {
-      cloud.radius = FART_CLOUD_RADIUS;
-    }
-
-    // Damage player on tick
-    cloud.tickTimer -= dt;
-    if (cloud.tickTimer <= 0) {
-      cloud.tickTimer += FART_CLOUD_TICK;
-      const pcx = player.x + PLAYER_W / 2;
-      const pcy = player.y + PLAYER_H / 2;
-      const dist = Math.hypot(pcx - cloud.x, pcy - cloud.y);
-      if (dist < cloud.radius && player.iframes <= 0) {
-        let dmg = FART_CLOUD_DPS * FART_CLOUD_TICK; // 6 per tick
-        if (player.metalTimer > 0) {
-          dmg = Math.round(dmg * 0.3);
-          spawnParticles(pcx, pcy, '#aaccff', 3, 80, 0.2);
-        }
-        player.hp -= dmg;
-        player.flashTimer = 0.1;
-        spawnDamageNumber(pcx, player.y, dmg, '#88ff44');
-        playSound('hurt');
-      }
-    }
-
-    // Spawn ambient green particles
-    if (Math.random() < 0.3) {
-      const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * cloud.radius * 0.8;
-      particles.push({
-        x: cloud.x + Math.cos(angle) * r,
-        y: cloud.y + Math.sin(angle) * r,
-        vx: (Math.random() - 0.5) * 30,
-        vy: -20 - Math.random() * 40,
-        life: 0.4 + Math.random() * 0.3,
-        maxLife: 0.7,
-        color: Math.random() < 0.5 ? '#66ff44' : '#44cc22',
-        size: 2 + Math.random() * 2
-      });
-    }
-  }
-}
-
-function drawFartClouds() {
-  for (const cloud of fartClouds) {
-    const fadeStart = FART_CLOUD_DURATION * 0.25;
-    const alpha = cloud.life < fadeStart ? (cloud.life / fadeStart) : 1;
-    const baseAlpha = 0.35 * alpha;
-
-    // Radial gradient green cloud
-    const grad = ctx.createRadialGradient(cloud.x, cloud.y, 0, cloud.x, cloud.y, cloud.radius);
-    grad.addColorStop(0, `rgba(80,180,30,${baseAlpha})`);
-    grad.addColorStop(0.5, `rgba(60,140,20,${baseAlpha * 0.7})`);
-    grad.addColorStop(1, `rgba(40,100,10,0)`);
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(cloud.x, cloud.y, cloud.radius, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Pulsing inner blobs
-    const now = performance.now();
-    for (let b = 0; b < 4; b++) {
-      const bAngle = (b / 4) * Math.PI * 2 + now * 0.002;
-      const bDist = cloud.radius * 0.3 + Math.sin(now * 0.004 + b * 1.5) * cloud.radius * 0.15;
-      const bx = cloud.x + Math.cos(bAngle) * bDist;
-      const by = cloud.y + Math.sin(bAngle) * bDist;
-      const blobR = cloud.radius * 0.25 + Math.sin(now * 0.005 + b) * cloud.radius * 0.05;
-      const blobGrad = ctx.createRadialGradient(bx, by, 0, bx, by, blobR);
-      blobGrad.addColorStop(0, `rgba(100,220,40,${baseAlpha * 0.6})`);
-      blobGrad.addColorStop(1, `rgba(60,140,20,0)`);
-      ctx.fillStyle = blobGrad;
-      ctx.beginPath();
-      ctx.arc(bx, by, blobR, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-}
-
 function drawBoss() {
   if (!boss || !bossActive) return;
 
@@ -1404,19 +1520,28 @@ function drawBoss() {
 
   ctx.save();
 
-  // Aura — green for QP, red for normal
+  // Aura (green for QP, red for evil eggthony)
   const auraSize = boss.rage ? 1.4 : 1.15;
   const auraAlpha = boss.rage ? (0.25 + 0.15 * Math.sin(performance.now() * 0.01)) : 0.1;
   const auraGrad = ctx.createRadialGradient(bcx, bcy, boss.w * 0.3, bcx, bcy, boss.w * auraSize);
   if (boss.isQuentinPizza) {
-    auraGrad.addColorStop(0, `rgba(60,200,30,${auraAlpha})`);
-    auraGrad.addColorStop(1, 'rgba(60,200,30,0)');
+    auraGrad.addColorStop(0, `rgba(80,200,20,${auraAlpha})`);
+    auraGrad.addColorStop(1, 'rgba(80,200,20,0)');
   } else {
     auraGrad.addColorStop(0, `rgba(255,0,0,${auraAlpha})`);
     auraGrad.addColorStop(1, 'rgba(255,0,0,0)');
   }
   ctx.fillStyle = auraGrad;
   ctx.fillRect(bcx - boss.w * auraSize, bcy - boss.h * auraSize, boss.w * auraSize * 2, boss.h * auraSize * 2);
+
+  // Fart windup telegraph
+  if (boss.state === 'fart_windup') {
+    const fartAlpha = 0.3 + 0.2 * Math.sin(performance.now() * 0.02);
+    ctx.fillStyle = `rgba(80,200,30,${fartAlpha})`;
+    ctx.beginPath();
+    ctx.ellipse(bcx, PLATFORM_Y - 5, boss.w * 0.8, boss.h * 0.3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // Charge telegraph arrows
   if (boss.state === 'charge_windup') {
@@ -1431,21 +1556,11 @@ function drawBoss() {
     }
   }
 
-  // Fart windup telegraph — pulsing green ellipse on ground
-  if (boss.state === 'fart_windup') {
-    const fartAlpha = 0.3 + 0.3 * Math.sin(performance.now() * 0.02);
-    ctx.fillStyle = `rgba(80,200,30,${fartAlpha})`;
-    ctx.beginPath();
-    ctx.ellipse(bcx, PLATFORM_Y - 5, FART_CLOUD_RADIUS * 0.6, 12, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Draw sprite — three-way selection
-  const bossSprite = boss.isQuentinPizza ? (quentinPizzaSpriteLoaded ? quentinPizzaSprite : null)
-    : boss.appearance >= 2 ? (evilSprite2Loaded ? evilSprite2 : (evilSpriteLoaded ? evilSprite : null))
-    : (evilSpriteLoaded ? evilSprite : null);
-
-  if (bossSprite) {
+  // Draw sprite — QP → quentinPizzaSprite, app>=2 → evilSprite2, else evilSprite
+  const useQP = boss.isQuentinPizza && quentinPizzaSpriteLoaded;
+  const useSprite2 = !useQP && boss.appearance >= 2 && evilSprite2Loaded;
+  const bossSprite = useQP ? quentinPizzaSprite : (useSprite2 ? evilSprite2 : evilSprite);
+  if (useQP || useSprite2 || evilSpriteLoaded) {
     ctx.save();
     if (!boss.facingRight) {
       ctx.translate(bcx, bcy);
@@ -1464,8 +1579,7 @@ function drawBoss() {
     if (boss.rage) {
       ctx.globalCompositeOperation = 'source-atop';
       const tint = 0.15 + 0.1 * Math.sin(performance.now() * 0.008);
-      const rageTint = boss.isQuentinPizza ? `rgba(0,255,0,${tint})` : `rgba(255,0,0,${tint})`;
-      ctx.fillStyle = rageTint;
+      ctx.fillStyle = boss.isQuentinPizza ? `rgba(80,200,20,${tint})` : `rgba(255,0,0,${tint})`;
       ctx.fillRect(boss.x, boss.y, boss.w, boss.h);
     }
 
@@ -1525,14 +1639,11 @@ function drawBossHPBar() {
   const barW = W - 40;
   const barH = 18;
 
-  const isQP = boss.isQuentinPizza;
-  ctx.fillStyle = isQP ? '#002200' : '#220000';
+  ctx.fillStyle = '#220000';
   ctx.fillRect(barX, barY, barW, barH);
 
   const hpRatio = Math.max(0, boss.hp / boss.maxHp);
-  const barColor = isQP
-    ? (boss.rage ? '#44ff22' : '#22aa22')
-    : (boss.rage ? '#ff2222' : '#cc2222');
+  const barColor = boss.rage ? '#ff2222' : '#cc2222';
   ctx.fillStyle = barColor;
   ctx.fillRect(barX, barY, barW * hpRatio, barH);
 
@@ -1541,20 +1652,96 @@ function drawBossHPBar() {
     ctx.fillRect(barX, barY, barW * hpRatio, barH);
   }
 
-  ctx.strokeStyle = isQP
-    ? (boss.rage ? '#66ff44' : '#228822')
-    : (boss.rage ? '#ff4444' : '#882222');
+  ctx.strokeStyle = boss.rage ? '#ff4444' : '#882222';
   ctx.lineWidth = 2;
   ctx.strokeRect(barX, barY, barW, barH);
 
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 11px monospace';
   ctx.textAlign = 'left';
-  ctx.fillText(isQP ? 'QUENTIN PIZZA' : 'EVIL EGGTHONY', barX + 6, barY + 13);
+  ctx.fillText(boss.isQuentinPizza ? 'QUENTIN PIZZA' : 'EVIL EGGTHONY', barX + 6, barY + 13);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = '#ffcc44';
   ctx.fillText(`Lvl ${boss.appearance}`, barX + barW - 6, barY + 13);
+}
+
+// ============================================================
+// FART CLOUD SYSTEM
+// ============================================================
+function updateFartClouds(dt) {
+  const pcx = player.x + PLAYER_W / 2;
+  const pcy = player.y + PLAYER_H / 2;
+  for (let i = fartClouds.length - 1; i >= 0; i--) {
+    const c = fartClouds[i];
+    c.timer -= dt;
+    // Expand over first 0.5s
+    if (c.expandTimer > 0) {
+      c.expandTimer -= dt;
+      c.radius = c.maxRadius * (1 - c.expandTimer / 0.5);
+    } else {
+      c.radius = c.maxRadius;
+    }
+    // DPS tick
+    c.tickTimer -= dt;
+    if (c.tickTimer <= 0) {
+      c.tickTimer += FART_CLOUD_TICK;
+      // Damage player if in cloud
+      const dist = Math.hypot(pcx - c.x, pcy - c.y);
+      if (dist < c.radius && player.iframes <= 0 && player.metalTimer <= 0 && player.wingsTimer <= 0) {
+        const tickDmg = Math.round(c.dps * FART_CLOUD_TICK);
+        player.hp -= tickDmg;
+        player.flashTimer = 0.08;
+        spawnDamageNumber(pcx, player.y, tickDmg, '#88cc22');
+      }
+    }
+    // Ambient particles
+    if (Math.random() < 0.3) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * c.radius * 0.8;
+      particles.push({
+        x: c.x + Math.cos(angle) * r,
+        y: c.y + Math.sin(angle) * r - Math.random() * 20,
+        vx: (Math.random() - 0.5) * 30,
+        vy: -Math.random() * 40 - 10,
+        life: 0.5, maxLife: 0.5,
+        color: Math.random() < 0.5 ? '#66aa22' : '#88cc44',
+        size: Math.random() * 3 + 1
+      });
+    }
+    if (c.timer <= 0) {
+      fartClouds.splice(i, 1);
+    }
+  }
+}
+
+function drawFartClouds() {
+  for (const c of fartClouds) {
+    const alpha = Math.min(1, c.timer / 1.0) * 0.5;
+    const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, c.radius);
+    grad.addColorStop(0, `rgba(80,160,20,${alpha})`);
+    grad.addColorStop(0.6, `rgba(60,120,15,${alpha * 0.6})`);
+    grad.addColorStop(1, 'rgba(40,80,10,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(c.x, c.y, c.radius, 0, Math.PI * 2);
+    ctx.fill();
+    // Pulsing blobs
+    const pulse = 0.8 + 0.2 * Math.sin(performance.now() * 0.005 + c.x);
+    for (let b = 0; b < 4; b++) {
+      const ba = (b / 4) * Math.PI * 2 + performance.now() * 0.001;
+      const br = c.radius * 0.4 * pulse;
+      const bx = c.x + Math.cos(ba) * br;
+      const by = c.y + Math.sin(ba) * br * 0.6;
+      const blobGrad = ctx.createRadialGradient(bx, by, 0, bx, by, c.radius * 0.3);
+      blobGrad.addColorStop(0, `rgba(100,180,30,${alpha * 0.4})`);
+      blobGrad.addColorStop(1, 'rgba(60,120,15,0)');
+      ctx.fillStyle = blobGrad;
+      ctx.beginPath();
+      ctx.arc(bx, by, c.radius * 0.3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
 }
 
 // ============================================================
@@ -2213,7 +2400,9 @@ const player = {
   snotHolding: false,
   snotChargeTime: 0,
   airJumps: 1,
-  jumpHeld: false
+  jumpHeld: false,
+  wingsTimer: 0,
+  poopCooldown: 0
 };
 
 function resetPlayer() {
@@ -2234,6 +2423,8 @@ function resetPlayer() {
   player.snotChargeTime = 0;
   player.airJumps = 1;
   player.jumpHeld = false;
+  player.wingsTimer = 0;
+  player.poopCooldown = 0;
   lowHpTriggered = false;
 }
 
@@ -2244,65 +2435,85 @@ function updatePlayer(dt) {
   if (keys['d'] || keys['arrowright']) moveX += 1;
   player.vx = moveX * PLAYER_SPEED;
 
-  // Jump (SSBM-style double jump)
-  const jumpInput = keys['w'] || keys['arrowup'] || keys[' '];
-  if (jumpInput && !player.jumpHeld) {
-    if (player.onGround) {
-      // Grounded jump — full force
-      player.vy = JUMP_FORCE;
-      player.onGround = false;
-    } else if (player.airJumps > 0) {
-      // Aerial double jump — slightly weaker, resets vertical momentum
-      player.vy = JUMP_FORCE * 0.85;
-      player.airJumps--;
+  if (player.wingsTimer > 0) {
+    // Flying mode — rise to target height, gentle bob
+    const targetY = WINGS_FLY_Y;
+    if (player.y + PLAYER_H / 2 > targetY) {
+      player.vy = -WINGS_RISE_SPEED;
+      player.y += player.vy * dt;
+      if (player.y + PLAYER_H / 2 <= targetY) {
+        player.y = targetY - PLAYER_H / 2;
+        player.vy = 0;
+      }
+    } else {
+      // Gentle sine bob at target height
+      player.y = targetY - PLAYER_H / 2 + Math.sin(performance.now() * 0.003) * 4;
+      player.vy = 0;
     }
-  }
-  player.jumpHeld = jumpInput;
-
-  // Gravity
-  player.vy += GRAVITY * dt;
-
-  // Apply velocity
-  player.x += player.vx * dt;
-  player.y += player.vy * dt;
-
-  // Platform collision
-  const playerBottom = player.y + PLAYER_H;
-  const playerCenterX = player.x + PLAYER_W / 2;
-  const holdingDown = keys['s'] || keys['arrowdown'];
-  if (playerBottom >= PLATFORM_Y && player.vy >= 0 &&
-      playerCenterX > PLATFORM_X && playerCenterX < PLATFORM_X + PLATFORM_W &&
-      player.y + PLAYER_H - player.vy * dt <= PLATFORM_Y + 10) {
-    player.y = PLATFORM_Y - PLAYER_H;
-    player.vy = 0;
-    player.onGround = true;
-    player.airJumps = 1;
+    player.x += player.vx * dt;
+    player.onGround = false;
   } else {
-    // Check floating platforms (one-way, player-only)
-    let landedOnFloat = false;
-    if (player.vy >= 0) {
-      for (const fp of floatingPlatforms) {
-        if (fp.phase !== 'solid' && fp.phase !== 'warning') continue;
-        const fpTop = fp.y;
-        const fpLeft = fp.x;
-        const fpRight = fp.x + fp.w;
-        // Player center must be over platform
-        if (playerCenterX <= fpLeft || playerCenterX >= fpRight) continue;
-        // Falling through top surface check
-        if (playerBottom >= fpTop && player.y + PLAYER_H - player.vy * dt <= fpTop + 6) {
-          // Drop-through: holding down while on or near this platform
-          if (holdingDown) continue;
-          player.y = fpTop - PLAYER_H;
-          player.vy = 0;
-          player.onGround = true;
-          player.airJumps = 1;
-          landedOnFloat = true;
-          break;
-        }
+    // Jump (SSBM-style double jump)
+    const jumpInput = keys['w'] || keys['arrowup'] || keys[' '];
+    const jumpMult = player.muscleTimer > 0 ? 1.5 : 1;
+    if (jumpInput && !player.jumpHeld) {
+      if (player.onGround) {
+        // Grounded jump — full force (super jump in muscle mode)
+        player.vy = JUMP_FORCE * jumpMult;
+        player.onGround = false;
+      } else if (player.airJumps > 0) {
+        // Aerial double jump — slightly weaker, resets vertical momentum
+        player.vy = JUMP_FORCE * 0.85 * jumpMult;
+        player.airJumps--;
       }
     }
-    if (!landedOnFloat && playerBottom < PLATFORM_Y) {
-      player.onGround = false;
+    player.jumpHeld = jumpInput;
+
+    // Gravity
+    player.vy += GRAVITY * dt;
+
+    // Apply velocity
+    player.x += player.vx * dt;
+    player.y += player.vy * dt;
+
+    // Platform collision
+    const playerBottom = player.y + PLAYER_H;
+    const playerCenterX = player.x + PLAYER_W / 2;
+    const holdingDown = keys['s'] || keys['arrowdown'];
+    if (playerBottom >= PLATFORM_Y && player.vy >= 0 &&
+        playerCenterX > PLATFORM_X && playerCenterX < PLATFORM_X + PLATFORM_W &&
+        player.y + PLAYER_H - player.vy * dt <= PLATFORM_Y + 10) {
+      player.y = PLATFORM_Y - PLAYER_H;
+      player.vy = 0;
+      player.onGround = true;
+      player.airJumps = 1;
+    } else {
+      // Check floating platforms (one-way, player-only)
+      let landedOnFloat = false;
+      if (player.vy >= 0) {
+        for (const fp of floatingPlatforms) {
+          if (fp.phase !== 'solid' && fp.phase !== 'warning') continue;
+          const fpTop = fp.y;
+          const fpLeft = fp.x;
+          const fpRight = fp.x + fp.w;
+          // Player center must be over platform
+          if (playerCenterX <= fpLeft || playerCenterX >= fpRight) continue;
+          // Falling through top surface check
+          if (playerBottom >= fpTop && player.y + PLAYER_H - player.vy * dt <= fpTop + 6) {
+            // Drop-through: holding down while on or near this platform
+            if (holdingDown) continue;
+            player.y = fpTop - PLAYER_H;
+            player.vy = 0;
+            player.onGround = true;
+            player.airJumps = 1;
+            landedOnFloat = true;
+            break;
+          }
+        }
+      }
+      if (!landedOnFloat && playerBottom < PLATFORM_Y) {
+        player.onGround = false;
+      }
     }
   }
 
@@ -2326,7 +2537,31 @@ function updatePlayer(dt) {
   player.metalTimer = Math.max(0, player.metalTimer - dt);
   player.muscleTimer = Math.max(0, player.muscleTimer - dt);
   player.slamCooldown = Math.max(0, player.slamCooldown - dt);
+  const prevSnotCooldown = player.snotCooldown;
   player.snotCooldown = Math.max(0, player.snotCooldown - dt);
+  if (prevSnotCooldown > 0 && player.snotCooldown <= 0) {
+    snotReadyFlash = 2.0; // show "SNOT READY" for 2 seconds
+  }
+  const prevWingsTimer = player.wingsTimer;
+  player.wingsTimer = Math.max(0, player.wingsTimer - dt);
+  player.poopCooldown = Math.max(0, player.poopCooldown - dt);
+  // Wings expiry — spawn feather burst
+  if (prevWingsTimer > 0 && player.wingsTimer <= 0) {
+    const pcxW = player.x + PLAYER_W / 2;
+    const pcyW = player.y + PLAYER_H / 2;
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
+      particles.push({
+        x: pcxW + Math.cos(angle) * 10,
+        y: pcyW + Math.sin(angle) * 10,
+        vx: Math.cos(angle) * 80 + (Math.random() - 0.5) * 40,
+        vy: Math.sin(angle) * 80 - 30,
+        life: 0.8, maxLife: 0.8,
+        color: Math.random() < 0.5 ? '#ffdd88' : '#ffffff', size: 3
+      });
+    }
+    playSound('platCrumble');
+  }
 
   // Snot rocket hold-to-charge
   if (player.snotHolding) {
@@ -2345,10 +2580,18 @@ function updatePlayer(dt) {
     }
   }
 
-  // Lightning attack (left click or right click)
-  if ((mouse.left || mouse.right) && player.lightningCooldown <= 0) {
-    player.lightningCooldown = LIGHTNING_COOLDOWN;
-    fireLightning();
+  // Attack: poop dropper while flying, lightning otherwise
+  if (player.wingsTimer > 0) {
+    if ((mouse.left || mouse.right) && player.poopCooldown <= 0) {
+      player.poopCooldown = POOP_COOLDOWN;
+      firePoopBomb();
+    }
+  } else {
+    // Lightning attack (left click or right click)
+    if ((mouse.left || mouse.right) && player.lightningCooldown <= 0) {
+      player.lightningCooldown = LIGHTNING_COOLDOWN;
+      fireLightning();
+    }
   }
 }
 
@@ -2356,10 +2599,11 @@ function drawPlayer() {
   const px = player.x;
   const py = player.y;
 
-  // Iframes flicker (not during metal or muscle mode)
-  if (player.metalTimer <= 0 && player.muscleTimer <= 0 && player.iframes > 0 && Math.floor(player.iframes * 15) % 2 === 0) return;
+  // Iframes flicker (not during metal, muscle, or wings mode)
+  if (player.metalTimer <= 0 && player.muscleTimer <= 0 && player.wingsTimer <= 0 && player.iframes > 0 && Math.floor(player.iframes * 15) % 2 === 0) return;
   const isMetal = player.metalTimer > 0;
   const isMuscle = player.muscleTimer > 0;
+  const isFlying = player.wingsTimer > 0;
 
   ctx.save();
   const cx = px + PLAYER_W / 2;
@@ -2388,10 +2632,39 @@ function drawPlayer() {
     ctx.stroke();
   }
 
+  // Wings mode golden aura ring (drawn behind player)
+  if (isFlying && !isMetal) {
+    const auraPhase = performance.now() * 0.005;
+    const auraRadius = 55 + Math.sin(auraPhase) * 6;
+    const auraAlpha = 0.2 + 0.1 * Math.sin(auraPhase * 2);
+    ctx.strokeStyle = `rgba(255,220,100,${auraAlpha})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, auraRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.strokeStyle = `rgba(255,240,180,${auraAlpha * 0.5})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(cx, cy, auraRadius - 5, 0, Math.PI * 2);
+    ctx.stroke();
+    // Spawn feather particles while flying
+    if (Math.random() < 0.15) {
+      particles.push({
+        x: cx + (Math.random() - 0.5) * 40,
+        y: cy + PLAYER_H / 2,
+        vx: (Math.random() - 0.5) * 30,
+        vy: 20 + Math.random() * 30,
+        life: 0.6, maxLife: 0.6,
+        color: Math.random() < 0.5 ? '#ffdd88' : '#fff8e0', size: 2
+      });
+    }
+  }
+
   // Draw sprite
   const useMetalSprite = isMetal && metalSpriteLoaded;
   const useMuscleSprite = isMuscle && !isMetal && muscleSpriteLoaded;
-  const currentSprite = useMetalSprite ? metalSprite : (useMuscleSprite ? muscleSprite : eggSprite);
+  const useWingsSprite = isFlying && !isMetal && !useMuscleSprite && wingsSpriteLoaded;
+  const currentSprite = useMetalSprite ? metalSprite : (useMuscleSprite ? muscleSprite : (useWingsSprite ? wingsSprite : eggSprite));
   if (spriteLoaded) {
     ctx.save();
     if (!player.facingRight) {
@@ -2405,6 +2678,10 @@ function drawPlayer() {
     }
     // Blink warning when muscle is about to expire
     if (isMuscle && !isMetal && player.muscleTimer < 2 && Math.floor(player.muscleTimer * 8) % 2 === 0) {
+      ctx.globalAlpha = 0.5;
+    }
+    // Blink warning when wings are about to expire
+    if (isFlying && !isMetal && !isMuscle && player.wingsTimer < 2 && Math.floor(player.wingsTimer * 8) % 2 === 0) {
       ctx.globalAlpha = 0.5;
     }
     // Draw sprite at correct aspect ratio (centered on hitbox)
@@ -2435,6 +2712,14 @@ function drawPlayer() {
       ctx.fillRect(drawX, drawY, drawW, drawH);
     }
 
+    // Wings golden shimmer
+    if (isFlying && !isMetal && !isMuscle) {
+      ctx.globalCompositeOperation = 'source-atop';
+      const shimmer = 0.12 + 0.08 * Math.sin(performance.now() * 0.007);
+      ctx.fillStyle = `rgba(255,220,100,${shimmer})`;
+      ctx.fillRect(drawX, drawY, drawW, drawH);
+    }
+
     // White flash overlay
     if (player.flashTimer > 0) {
       ctx.globalCompositeOperation = 'source-atop';
@@ -2442,6 +2727,7 @@ function drawPlayer() {
       ctx.fillRect(drawX, drawY, drawW, drawH);
     }
     ctx.restore();
+
   } else {
     // Fallback egg shape
     ctx.fillStyle = player.flashTimer > 0 ? '#fff' : '#f5e6c8';
@@ -2452,6 +2738,22 @@ function drawPlayer() {
     const eyeOff = player.facingRight ? 5 : -5;
     ctx.fillRect(cx + eyeOff - 3, cy - 10, 3, 4);
     ctx.fillRect(cx + eyeOff + 5, cy - 10, 3, 4);
+  }
+
+  // "SNOT READY" flash above head
+  if (snotReadyFlash > 0) {
+    snotReadyFlash -= 1 / 60;
+    const alpha = snotReadyFlash > 1.5 ? (2.0 - snotReadyFlash) * 2 : Math.min(1, snotReadyFlash / 1.5);
+    const bob = Math.sin(performance.now() * 0.006) * 2;
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 12px monospace';
+    ctx.fillStyle = `rgba(170,255,50,${alpha})`;
+    ctx.shadowColor = '#aaff33';
+    ctx.shadowBlur = 6;
+    ctx.fillText('SNOT READY!', cx, py - 10 + bob);
+    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 
   ctx.restore();
@@ -3536,6 +3838,687 @@ function drawSmoothie() {
 }
 
 // ============================================================
+// WINGS POWERUP
+// ============================================================
+let wingsItem = null;
+let wingsSpawnTimer = 25 + Math.random() * 15;
+let poopBombs = [];
+
+function spawnWings() {
+  const x = PLATFORM_X + 40 + Math.random() * (PLATFORM_W - 80);
+  wingsItem = {
+    x,
+    y: -WINGS_SIZE,
+    vy: 50 + Math.random() * 40,
+    bobTimer: Math.random() * Math.PI * 2,
+    landed: false,
+    landY: 0
+  };
+}
+
+function updateWings(dt) {
+  if (!wingsItem) {
+    wingsSpawnTimer -= dt;
+    if (wingsSpawnTimer <= 0 && (enemies.length > 0 || (boss && !boss.dying))) {
+      wingsSpawnTimer = 25 + Math.random() * 15;
+      spawnWings();
+    }
+    return;
+  }
+
+  const w = wingsItem;
+
+  if (!w.landed) {
+    w.y += w.vy * dt;
+    if (w.y + WINGS_SIZE >= PLATFORM_Y) {
+      w.y = PLATFORM_Y - WINGS_SIZE;
+      w.landed = true;
+      w.landY = w.y;
+    }
+  } else {
+    w.bobTimer += dt * 3;
+    w.y = w.landY + Math.sin(w.bobTimer) * 3;
+  }
+
+  // Pickup collision
+  const pcx = player.x + PLAYER_W / 2;
+  const pcy = player.y + PLAYER_H / 2;
+  if (rectsOverlap(player.x, player.y, PLAYER_W, PLAYER_H, w.x - 4, w.y - 4, WINGS_SIZE + 8, WINGS_SIZE + 8)) {
+    player.wingsTimer = WINGS_DURATION;
+    wingsItem = null;
+    spawnParticles(pcx, pcy, '#ffdd88', 20, 150, 0.5);
+    spawnParticles(pcx, pcy, '#ffffff', 10, 100, 0.4);
+    addShake(5, 0.15);
+    playVoice('win', true);
+    playSound('wingsPickup');
+  }
+}
+
+function drawWings() {
+  if (!wingsItem) return;
+  const w = wingsItem;
+  const x = w.x;
+  const y = w.y;
+  const sz = WINGS_SIZE;
+
+  ctx.save();
+  ctx.shadowColor = '#ffcc44';
+  ctx.shadowBlur = 15;
+
+  if (wingsPowerupSpriteLoaded) {
+    ctx.drawImage(wingsPowerupSprite, x, y, sz, sz);
+  } else {
+    // Procedural fallback — golden wing shape
+    const glowAlpha = 0.3 + 0.15 * Math.sin(performance.now() * 0.005);
+    ctx.fillStyle = '#ffdd66';
+    // Left wing
+    ctx.beginPath();
+    ctx.moveTo(x + sz / 2, y + sz * 0.4);
+    ctx.quadraticCurveTo(x, y, x + 2, y + sz * 0.7);
+    ctx.quadraticCurveTo(x + sz * 0.3, y + sz * 0.6, x + sz / 2, y + sz * 0.4);
+    ctx.fill();
+    // Right wing
+    ctx.beginPath();
+    ctx.moveTo(x + sz / 2, y + sz * 0.4);
+    ctx.quadraticCurveTo(x + sz, y, x + sz - 2, y + sz * 0.7);
+    ctx.quadraticCurveTo(x + sz * 0.7, y + sz * 0.6, x + sz / 2, y + sz * 0.4);
+    ctx.fill();
+    // Center body
+    ctx.fillStyle = '#ffe088';
+    ctx.beginPath();
+    ctx.arc(x + sz / 2, y + sz * 0.5, sz * 0.12, 0, Math.PI * 2);
+    ctx.fill();
+    // Glow highlight
+    ctx.fillStyle = `rgba(255,255,200,${glowAlpha})`;
+    ctx.fillRect(x + sz * 0.3, y + sz * 0.3, 4, 5);
+  }
+
+  ctx.restore();
+}
+
+function firePoopBomb() {
+  const pcx = player.x + PLAYER_W / 2;
+  const pcy = player.y + PLAYER_H;
+  // Slight horizontal nudge toward mouse X
+  const dx = mouse.x - pcx;
+  const nudge = Math.sign(dx) * Math.min(Math.abs(dx) * 0.3, 60);
+  poopBombs.push({
+    x: pcx,
+    y: pcy,
+    vx: nudge,
+    vy: 40,
+    active: true
+  });
+  playSound('poopDrop');
+}
+
+function updatePoopBombs(dt) {
+  for (let i = poopBombs.length - 1; i >= 0; i--) {
+    const b = poopBombs[i];
+    if (!b.active) { poopBombs.splice(i, 1); continue; }
+
+    b.vy += POOP_GRAVITY * dt;
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+
+    // Trail particles
+    if (Math.random() < 0.4) {
+      particles.push({
+        x: b.x + (Math.random() - 0.5) * 6,
+        y: b.y - 2,
+        vx: (Math.random() - 0.5) * 20,
+        vy: -10 - Math.random() * 20,
+        life: 0.3, maxLife: 0.3,
+        color: Math.random() < 0.5 ? '#8B6914' : '#6B8E23', size: 2
+      });
+    }
+
+    // Direct hit enemies
+    for (let j = enemies.length - 1; j >= 0; j--) {
+      const e = enemies[j];
+      if (e.dying) continue;
+      if (Math.abs(b.x - (e.x + e.w / 2)) < e.w / 2 + POOP_SIZE &&
+          Math.abs(b.y - (e.y + e.h / 2)) < e.h / 2 + POOP_SIZE) {
+        b.active = false;
+        poopAOEDamage(b.x, b.y);
+        break;
+      }
+    }
+    if (!b.active) continue;
+
+    // Direct hit boss
+    if (boss && !boss.dying && boss.state !== 'entering') {
+      if (b.x > boss.x && b.x < boss.x + boss.w &&
+          b.y > boss.y && b.y < boss.y + boss.h) {
+        b.active = false;
+        poopAOEDamage(b.x, b.y);
+        continue;
+      }
+    }
+
+    // Hit platform
+    if (b.y >= PLATFORM_Y) {
+      b.active = false;
+      poopAOEDamage(b.x, PLATFORM_Y);
+    }
+
+    // Off screen
+    if (b.y > H + 50 || b.x < -50 || b.x > W + 50) {
+      poopBombs.splice(i, 1);
+    }
+  }
+}
+
+function poopAOEDamage(cx, cy) {
+  playSound('poopSplat');
+  addShake(4, 0.1);
+
+  // Brown/green splat particles
+  for (let i = 0; i < 16; i++) {
+    const angle = (i / 16) * Math.PI * 2 + Math.random() * 0.3;
+    const speed = 80 + Math.random() * 120;
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed - 40,
+      life: 0.5, maxLife: 0.5,
+      color: Math.random() < 0.5 ? '#8B6914' : '#6B8E23',
+      size: 3 + Math.random() * 3
+    });
+  }
+
+  // Damage enemies in radius
+  for (const e of enemies) {
+    if (e.dying) continue;
+    const ex = e.x + e.w / 2;
+    const ey = e.y + e.h / 2;
+    const dist = Math.hypot(ex - cx, ey - cy);
+    if (dist < POOP_AOE_RADIUS) {
+      e.hp -= POOP_DAMAGE;
+      spawnDamageNumber(ex, e.y, POOP_DAMAGE, '#8B6914');
+      e.flashTimer = 0.1;
+      if (e.hp <= 0 && !e.dying) {
+        e.dying = true;
+        e.deathTimer = 0.4;
+        score += e.type === 'brute' ? 30 : e.type === 'spitter' ? 20 : 10;
+      }
+    }
+  }
+
+  // Damage boss in radius
+  if (boss && !boss.dying && boss.state !== 'entering') {
+    const bx = boss.x + boss.w / 2;
+    const by = boss.y + boss.h / 2;
+    const dist = Math.hypot(bx - cx, by - cy);
+    if (dist < POOP_AOE_RADIUS) {
+      const knockDir = Math.sign(bx - cx) || 1;
+      damageBoss(POOP_DAMAGE, knockDir * 30, -20);
+    }
+  }
+}
+
+function drawPoopBombs() {
+  for (const b of poopBombs) {
+    if (!b.active) continue;
+    ctx.save();
+    // Glow
+    ctx.shadowColor = '#8B6914';
+    ctx.shadowBlur = 8;
+    // Brown ellipse body
+    ctx.fillStyle = '#6B4226';
+    ctx.beginPath();
+    ctx.ellipse(b.x, b.y, POOP_SIZE * 0.7, POOP_SIZE, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Highlight
+    ctx.fillStyle = '#8B6914';
+    ctx.beginPath();
+    ctx.ellipse(b.x - 2, b.y - 3, POOP_SIZE * 0.3, POOP_SIZE * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+// ============================================================
+// CHESTPLATE POWERUP + DWYER ALLY
+// ============================================================
+let chestplateItem = null;
+let chestplateSpawnTimer = 30 + Math.random() * 15;
+let dwyer = null;
+
+function spawnChestplate() {
+  const x = PLATFORM_X + 40 + Math.random() * (PLATFORM_W - 80);
+  chestplateItem = {
+    x,
+    y: -CHESTPLATE_SIZE,
+    vy: 55 + Math.random() * 40,
+    bobTimer: Math.random() * Math.PI * 2,
+    landed: false,
+    landY: 0
+  };
+}
+
+function updateChestplate(dt) {
+  if (!chestplateItem) {
+    chestplateSpawnTimer -= dt;
+    if (chestplateSpawnTimer <= 0 && round >= 4 && !dwyer && (enemies.length > 0 || (boss && !boss.dying))) {
+      chestplateSpawnTimer = 30 + Math.random() * 15;
+      spawnChestplate();
+    }
+    return;
+  }
+
+  const c = chestplateItem;
+
+  if (!c.landed) {
+    c.y += c.vy * dt;
+    if (c.y + CHESTPLATE_SIZE >= PLATFORM_Y) {
+      c.y = PLATFORM_Y - CHESTPLATE_SIZE;
+      c.landed = true;
+      c.landY = c.y;
+    }
+  } else {
+    c.bobTimer += dt * 3;
+    c.y = c.landY + Math.sin(c.bobTimer) * 3;
+  }
+
+  // Pickup collision
+  if (rectsOverlap(player.x, player.y, PLAYER_W, PLAYER_H, c.x - 4, c.y - 4, CHESTPLATE_SIZE + 8, CHESTPLATE_SIZE + 8)) {
+    dwyer = createDwyer();
+    chestplateItem = null;
+    const pcx = player.x + PLAYER_W / 2;
+    const pcy = player.y + PLAYER_H / 2;
+    spawnParticles(pcx, pcy, '#ddaa44', 12, 120, 0.4);
+    addShake(3, 0.1);
+    dwyerClip.currentTime = 0;
+    dwyerClip.play().catch(() => {});
+    playSound('roundStart');
+  }
+}
+
+function drawChestplate() {
+  if (!chestplateItem) return;
+  const c = chestplateItem;
+  const x = c.x;
+  const y = c.y;
+  const sz = CHESTPLATE_SIZE;
+
+  ctx.save();
+  ctx.shadowColor = '#ddaa44';
+  ctx.shadowBlur = 15;
+
+  if (chestplateSpriteLoaded) {
+    ctx.drawImage(chestplateSprite, x, y, sz, sz);
+  } else {
+    // Procedural fallback — golden chestplate
+    const glowAlpha = 0.3 + 0.15 * Math.sin(performance.now() * 0.005);
+    ctx.fillStyle = '#bb8833';
+    ctx.fillRect(x + 4, y + 6, sz - 8, sz - 10);
+    ctx.fillStyle = '#ddaa44';
+    ctx.fillRect(x + 6, y + 8, sz - 12, sz - 14);
+    ctx.fillStyle = `rgba(255,220,120,${glowAlpha})`;
+    ctx.fillRect(x + 8, y + 10, 5, 6);
+  }
+
+  ctx.restore();
+}
+
+function createDwyer() {
+  // Pick a landing X near center of platform (avoid edges)
+  const landX = PLATFORM_X + 60 + Math.random() * (PLATFORM_W - 120);
+  return {
+    x: landX,
+    y: -DWYER_H - 60,   // start way above screen
+    vx: 0,
+    vy: 0,
+    w: DWYER_W,
+    h: DWYER_H,
+    timer: DWYER_DURATION,
+    facingRight: player.facingRight || true,
+    attackCooldown: 0,
+    attacking: false,
+    attackTimer: 0,
+    onPlatform: false,
+    // Dramatic entrance state
+    entering: true,
+    landingShockwave: 0,  // 0 = not yet, >0 = expanding ring timer
+    entryTrailTimer: 0
+  };
+}
+
+function dwyerLandingAOE() {
+  const cx = dwyer.x + dwyer.w / 2;
+  const cy = PLATFORM_Y;
+
+  // Massive screen shake
+  addShake(18, 0.5);
+  playSound('slam');
+  playNoise(0.3, 0.25);
+
+  // Huge particle explosion — gold, red, white
+  spawnParticles(cx, cy, '#ffdd44', 35, 300, 0.8);
+  spawnParticles(cx, cy, '#cc3333', 25, 250, 0.7);
+  spawnParticles(cx, cy, '#ffffff', 15, 200, 0.5);
+  // Ground dust ring
+  for (let i = 0; i < 20; i++) {
+    const angle = (i / 20) * Math.PI * 2;
+    const speed = 150 + Math.random() * 200;
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.4 - 60,
+      life: 0.7, maxLife: 0.7,
+      color: Math.random() < 0.5 ? '#ddaa44' : '#aa7733',
+      size: 3 + Math.random() * 4
+    });
+  }
+
+  // Damage all enemies in AOE
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    if (e.dying) continue;
+    const ex = e.x + e.w / 2;
+    const ey = e.y + e.h / 2;
+    const dist = Math.hypot(ex - cx, ey - cy);
+    if (dist < DWYER_LANDING_AOE_RADIUS) {
+      const knockDir = ex > cx ? 1 : -1;
+      const knockScale = 1 - dist / DWYER_LANDING_AOE_RADIUS;
+      damageEnemy(i, DWYER_LANDING_DAMAGE, knockDir * 300 * knockScale, -200 * knockScale);
+    }
+  }
+
+  // Damage boss in AOE
+  if (boss && !boss.dying && boss.state !== 'entering') {
+    const bx = boss.x + boss.w / 2;
+    const by = boss.y + boss.h / 2;
+    const dist = Math.hypot(bx - cx, by - cy);
+    if (dist < DWYER_LANDING_AOE_RADIUS) {
+      const knockDir = bx > cx ? 1 : -1;
+      damageBoss(DWYER_LANDING_DAMAGE, knockDir * 200, 0);
+    }
+  }
+
+  // Start shockwave ring visual
+  dwyer.landingShockwave = 0.5;
+  dwyer.shockwaveX = cx;
+  dwyer.shockwaveY = cy;
+}
+
+function updateDwyer(dt) {
+  if (!dwyer) return;
+
+  // Shockwave ring timer (visual only, ticks even during entering)
+  if (dwyer.landingShockwave > 0) {
+    dwyer.landingShockwave -= dt;
+  }
+
+  // === ENTERING STATE: falling from sky ===
+  if (dwyer.entering) {
+    // Accelerate downward (fast dramatic drop)
+    dwyer.vy += 2800 * dt;
+    dwyer.y += dwyer.vy * dt;
+
+    // Trail particles while falling
+    dwyer.entryTrailTimer -= dt;
+    if (dwyer.entryTrailTimer <= 0 && dwyer.y > -DWYER_H) {
+      dwyer.entryTrailTimer = 0.02;
+      const cx = dwyer.x + dwyer.w / 2;
+      particles.push({
+        x: cx + (Math.random() - 0.5) * 20,
+        y: dwyer.y + dwyer.h,
+        vx: (Math.random() - 0.5) * 40,
+        vy: -80 - Math.random() * 60,
+        life: 0.35, maxLife: 0.35,
+        color: Math.random() < 0.5 ? '#ffdd44' : '#ff6633',
+        size: 3 + Math.random() * 3
+      });
+    }
+
+    // Land on platform
+    if (dwyer.y + dwyer.h >= PLATFORM_Y) {
+      dwyer.y = PLATFORM_Y - dwyer.h;
+      dwyer.vy = 0;
+      dwyer.onPlatform = true;
+      dwyer.entering = false;
+      dwyerLandingAOE();
+    }
+    return;
+  }
+
+  dwyer.timer -= dt;
+  if (dwyer.timer <= 0) {
+    // Despawn with poof particles
+    spawnParticles(dwyer.x + dwyer.w / 2, dwyer.y + dwyer.h / 2, '#ddaa44', 15, 150, 0.5);
+    spawnParticles(dwyer.x + dwyer.w / 2, dwyer.y + dwyer.h / 2, '#cc3333', 8, 100, 0.4);
+    dwyer = null;
+    return;
+  }
+
+  // Attack cooldown
+  if (dwyer.attackCooldown > 0) dwyer.attackCooldown -= dt;
+  if (dwyer.attackTimer > 0) dwyer.attackTimer -= dt;
+
+  // Gravity
+  dwyer.vy += 1400 * dt;
+  dwyer.y += dwyer.vy * dt;
+
+  // Land on main platform
+  if (dwyer.y + dwyer.h >= PLATFORM_Y) {
+    dwyer.y = PLATFORM_Y - dwyer.h;
+    dwyer.vy = 0;
+    dwyer.onPlatform = true;
+  }
+
+  // Find nearest target (enemy or boss)
+  let targetX = null;
+  let targetY = null;
+  let targetDist = Infinity;
+  let targetIsEnemy = false;
+  let targetIndex = -1;
+
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
+    if (e.dying) continue;
+    const ex = e.x + e.w / 2;
+    const ey = e.y + e.h / 2;
+    const dist = Math.abs(ex - (dwyer.x + dwyer.w / 2));
+    if (dist < targetDist) {
+      targetDist = dist;
+      targetX = ex;
+      targetY = ey;
+      targetIsEnemy = true;
+      targetIndex = i;
+    }
+  }
+
+  if (boss && !boss.dying && boss.state !== 'entering') {
+    const bx = boss.x + boss.w / 2;
+    const dist = Math.abs(bx - (dwyer.x + dwyer.w / 2));
+    if (dist < targetDist) {
+      targetDist = dist;
+      targetX = bx;
+      targetY = boss.y + boss.h / 2;
+      targetIsEnemy = false;
+      targetIndex = -1;
+    }
+  }
+
+  // Movement: follow player if no target nearby, or approach target
+  const dwyerCx = dwyer.x + dwyer.w / 2;
+  if (targetX !== null && targetDist < 300) {
+    // Move toward target
+    if (targetDist > DWYER_ATTACK_RANGE) {
+      const dir = targetX > dwyerCx ? 1 : -1;
+      dwyer.vx = dir * DWYER_SPEED;
+      dwyer.facingRight = dir > 0;
+    } else {
+      // In attack range — stop and attack
+      dwyer.vx = 0;
+      dwyer.facingRight = targetX > dwyerCx;
+
+      if (dwyer.attackCooldown <= 0) {
+        dwyer.attacking = true;
+        dwyer.attackTimer = 0.3;
+        dwyer.attackCooldown = DWYER_ATTACK_COOLDOWN;
+
+        if (targetIsEnemy && targetIndex >= 0) {
+          const e = enemies[targetIndex];
+          const knockDir = e.x + e.w / 2 > dwyerCx ? 1 : -1;
+          damageEnemy(targetIndex, DWYER_ATTACK_DAMAGE, knockDir * 150, -80);
+        } else if (boss && !boss.dying) {
+          const knockDir = boss.x + boss.w / 2 > dwyerCx ? 1 : -1;
+          damageBoss(DWYER_ATTACK_DAMAGE, knockDir * 100, 0);
+        }
+
+        playSound('punch');
+        spawnParticles(
+          dwyerCx + (dwyer.facingRight ? 30 : -30),
+          dwyer.y + dwyer.h * 0.4,
+          '#ffcc44', 5, 80, 0.2
+        );
+      }
+    }
+  } else {
+    // Follow player
+    const playerCx = player.x + PLAYER_W / 2;
+    const followDist = Math.abs(playerCx - dwyerCx);
+    if (followDist > 50) {
+      const dir = playerCx > dwyerCx ? 1 : -1;
+      dwyer.vx = dir * DWYER_SPEED;
+      dwyer.facingRight = dir > 0;
+    } else {
+      dwyer.vx = 0;
+    }
+  }
+
+  dwyer.x += dwyer.vx * dt;
+
+  // Clamp to platform edges
+  if (dwyer.x < PLATFORM_X) dwyer.x = PLATFORM_X;
+  if (dwyer.x + dwyer.w > PLATFORM_X + PLATFORM_W) dwyer.x = PLATFORM_X + PLATFORM_W - dwyer.w;
+}
+
+function drawDwyer() {
+  if (!dwyer) return;
+
+  // Blink warning when about to expire (not during entering)
+  if (!dwyer.entering && dwyer.timer < 2 && Math.floor(dwyer.timer * 8) % 2 === 0) return;
+
+  ctx.save();
+
+  const dx = dwyer.x;
+  const dy = dwyer.y;
+
+  // Entry drop: draw speed lines behind Dwyer while falling
+  if (dwyer.entering && dwyer.y > -DWYER_H) {
+    ctx.save();
+    const trailAlpha = Math.min(1, dwyer.vy / 600);
+    ctx.strokeStyle = `rgba(255,200,60,${trailAlpha * 0.6})`;
+    ctx.lineWidth = 3;
+    const cx = dx + dwyer.w / 2;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx + i * 12, dy - 5);
+      ctx.lineTo(cx + i * 12, dy - 40 - Math.random() * 30);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Draw sprite or procedural fallback
+  if (dwyerSpriteLoaded) {
+    ctx.save();
+    if (!dwyer.facingRight) {
+      ctx.translate(dx + dwyer.w, dy);
+      ctx.scale(-1, 1);
+      ctx.drawImage(dwyerSprite, 0, 0, dwyer.w, dwyer.h);
+    } else {
+      ctx.drawImage(dwyerSprite, dx, dy, dwyer.w, dwyer.h);
+    }
+    ctx.restore();
+  } else {
+    // Procedural fallback — cube-ish Roman soldier
+    ctx.fillStyle = '#cc3333';
+    ctx.fillRect(dx + 12, dy + 12, dwyer.w - 24, dwyer.h - 24);
+    ctx.fillStyle = '#ddaa44';
+    ctx.fillRect(dx + 18, dy + 5, dwyer.w - 36, 20); // helmet
+    ctx.fillStyle = '#fff';
+    const eyeX = dwyer.facingRight ? dx + dwyer.w - 30 : dx + 18;
+    ctx.fillRect(eyeX, dy + 38, 10, 10);
+  }
+
+  // Sword — swings during attack, held at side otherwise
+  if (!dwyer.entering) {
+    const swordSize = 50;
+    const pivotX = dwyer.facingRight ? dx + dwyer.w - 10 : dx + 10;
+    const pivotY = dy + dwyer.h * 0.4;
+    const flipX = dwyer.facingRight ? 1 : -1;
+
+    ctx.save();
+    ctx.translate(pivotX, pivotY);
+    ctx.scale(flipX, 1);
+
+    if (dwyer.attackTimer > 0) {
+      // Swing arc: rotate from raised (-90deg) to slashed forward (+30deg)
+      const swingProgress = 1 - dwyer.attackTimer / 0.3;
+      const swingAngle = -Math.PI * 0.5 + swingProgress * Math.PI * 0.65;
+      ctx.rotate(swingAngle);
+
+      // Slash trail arc behind the sword
+      const trailAlpha = dwyer.attackTimer / 0.3 * 0.6;
+      ctx.strokeStyle = `rgba(255,220,100,${trailAlpha})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, swordSize * 0.8, -Math.PI * 0.5, swingAngle, false);
+      ctx.stroke();
+    } else {
+      // Idle: held down at a slight angle
+      ctx.rotate(Math.PI * 0.15);
+    }
+
+    if (swordSpriteLoaded) {
+      ctx.drawImage(swordSprite, -6, -swordSize + 8, swordSize, swordSize);
+    } else {
+      // Procedural fallback — simple blade shape
+      ctx.fillStyle = '#ccccdd';
+      ctx.fillRect(-3, -swordSize + 8, 6, swordSize * 0.65);
+      ctx.fillStyle = '#ddaa44';
+      ctx.fillRect(-5, -swordSize + 8 + swordSize * 0.65, 10, 8);
+    }
+
+    ctx.restore();
+  }
+
+  // Landing shockwave ring
+  if (dwyer.landingShockwave > 0) {
+    const t = 1 - dwyer.landingShockwave / 0.5; // 0→1 as ring expands
+    const radius = DWYER_LANDING_AOE_RADIUS * t;
+    const alpha = (1 - t) * 0.8;
+    ctx.save();
+    // Outer ring
+    ctx.strokeStyle = `rgba(255,200,60,${alpha})`;
+    ctx.lineWidth = 4 + (1 - t) * 6;
+    ctx.beginPath();
+    ctx.arc(dwyer.shockwaveX, dwyer.shockwaveY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    // Inner glow ring
+    ctx.strokeStyle = `rgba(255,255,200,${alpha * 0.5})`;
+    ctx.lineWidth = 2 + (1 - t) * 3;
+    ctx.beginPath();
+    ctx.arc(dwyer.shockwaveX, dwyer.shockwaveY, radius * 0.6, 0, Math.PI * 2);
+    ctx.stroke();
+    // Ground flash
+    if (t < 0.3) {
+      const flashAlpha = (0.3 - t) / 0.3 * 0.4;
+      ctx.fillStyle = `rgba(255,220,100,${flashAlpha})`;
+      ctx.fillRect(dwyer.shockwaveX - DWYER_LANDING_AOE_RADIUS, dwyer.shockwaveY - 8, DWYER_LANDING_AOE_RADIUS * 2, 16);
+    }
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// ============================================================
 // WAVE SYSTEM
 // ============================================================
 let waveEnemiesRemaining = 0;
@@ -3555,13 +4538,14 @@ function startRound(r) {
     bossEntering = true;
     bossDefeated = false;
     playSound('bossRoar');
+    playVoice('boss', true);
   } else {
     waveEnemiesTotal = 3 + r * 3;
     waveEnemiesSpawned = 0;
     waveEnemiesRemaining = waveEnemiesTotal;
     waveSpawnTimer = 0;
   }
-  // Reset floating platforms and fart clouds
+  // Reset floating platforms
   floatingPlatforms = [];
   occupiedSlots = new Set();
   floatPlatSpawnTimer = 3.0;
@@ -3705,6 +4689,52 @@ function drawHUD() {
     ctx.fillText('MUSCLE', W / 2, mby + 10);
   }
 
+  // Wings mode indicator
+  if (player.wingsTimer > 0) {
+    const wBarW = 100;
+    const wBarH = 10;
+    const wbx = W / 2 - wBarW / 2;
+    // Offset down if metal and/or muscle are also active
+    let wby = 50;
+    if (player.metalTimer > 0) wby += 14;
+    if (player.muscleTimer > 0) wby += 14;
+    const wRatio = player.wingsTimer / WINGS_DURATION;
+    ctx.fillStyle = '#332200';
+    ctx.fillRect(wbx, wby, wBarW, wBarH);
+    ctx.fillStyle = wRatio < 0.3 ? '#997744' : '#ffdd88';
+    ctx.fillRect(wbx, wby, wBarW * wRatio, wBarH);
+    ctx.strokeStyle = '#ffcc44';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(wbx, wby, wBarW, wBarH);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillStyle = '#ffeeaa';
+    ctx.fillText('WINGS', W / 2, wby + 10);
+  }
+
+  // Dwyer ally indicator
+  if (dwyer) {
+    const dBarW = 100;
+    const dBarH = 10;
+    const dbx = W / 2 - dBarW / 2;
+    let dby = 50;
+    if (player.metalTimer > 0) dby += 14;
+    if (player.muscleTimer > 0) dby += 14;
+    if (player.wingsTimer > 0) dby += 14;
+    const dRatio = dwyer.timer / DWYER_DURATION;
+    ctx.fillStyle = '#332200';
+    ctx.fillRect(dbx, dby, dBarW, dBarH);
+    ctx.fillStyle = dRatio < 0.3 ? '#886633' : '#ddaa44';
+    ctx.fillRect(dbx, dby, dBarW * dRatio, dBarH);
+    ctx.strokeStyle = '#ddaa44';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(dbx, dby, dBarW, dBarH);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillStyle = '#ffddaa';
+    ctx.fillText('DWYER', W / 2, dby + 10);
+  }
+
   // Snot rocket cooldown / charge indicator
   if (player.snotHolding) {
     // Show charge bar while holding
@@ -3786,10 +4816,24 @@ function drawTitleScreen() {
       'HOLD Q/E - Aim snot mortar, release to fire!',
     ])
   ];
-  const ctrlY = cy + 350;
+  const ctrlY = cy + 470;
   controls.forEach((line, i) => {
     ctx.fillText(line, W / 2, ctrlY + i * 24);
   });
+
+  // Top scores on title
+  if (leaderboardData.length > 0) {
+    const lbY = ctrlY + controls.length * 24 + 20;
+    ctx.fillStyle = '#ffcc00';
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText('TOP SCORES', W / 2, lbY);
+    for (let i = 0; i < Math.min(leaderboardData.length, 5); i++) {
+      const e = leaderboardData[i];
+      ctx.fillStyle = '#999';
+      ctx.font = '12px monospace';
+      ctx.fillText(`${i + 1}. ${e.name}  ${e.score}  R${e.round}`, W / 2, lbY + 18 + i * 16);
+    }
+  }
 
   // Blink
   titleBlink += 0.03;
@@ -3802,62 +4846,52 @@ function drawTitleScreen() {
   if (devMenuOpen) {
     ctx.fillStyle = 'rgba(0,0,0,0.85)';
     ctx.fillRect(0, 0, W, H);
-
     ctx.textAlign = 'center';
-    ctx.fillStyle = '#ff4444';
-    ctx.font = 'bold 32px monospace';
+    ctx.fillStyle = '#ffcc00';
+    ctx.font = 'bold 28px monospace';
     ctx.fillText('DEV MENU', W / 2, 60);
-
     ctx.fillStyle = '#888';
-    ctx.font = '12px monospace';
-    ctx.fillText('Select a round to start', W / 2, 85);
+    ctx.font = '14px monospace';
+    ctx.fillText('Select round to start', W / 2, 85);
 
-    // Round buttons: 5 columns x 3 rows (rounds 1-15)
+    // 5x3 grid of round buttons
     const cols = 5, rows = 3;
-    const btnW = 70, btnH = 40, padX = 12, padY = 10;
-    const gridW = cols * btnW + (cols - 1) * padX;
+    const btnW = 70, btnH = 50, gap = 10;
+    const gridW = cols * btnW + (cols - 1) * gap;
     const startX = (W - gridW) / 2;
     const startY = 110;
-
     for (let row = 0; row < rows; row++) {
       for (let col = 0; col < cols; col++) {
         const r = row * cols + col + 1;
-        const bx = startX + col * (btnW + padX);
-        const by = startY + row * (btnH + padY);
-
-        // Color: QP boss rounds green, other boss rounds red, normal gray
-        const isBoss = isBossRound(r);
-        const isQP = isBoss && bossAppearance(r) >= 3;
-        if (isQP) {
-          ctx.fillStyle = '#225533';
-        } else if (isBoss) {
-          ctx.fillStyle = '#552222';
-        } else {
-          ctx.fillStyle = '#333';
-        }
+        const bx = startX + col * (btnW + gap);
+        const by = startY + row * (btnH + gap);
+        const isBoss = r >= 3 && r % 3 === 0;
+        const isQPRound = isBoss && bossAppearance(r) >= 3;
+        ctx.fillStyle = isQPRound ? '#224422' : (isBoss ? '#442222' : '#333');
         ctx.fillRect(bx, by, btnW, btnH);
-        ctx.strokeStyle = isQP ? '#44ff88' : isBoss ? '#ff4444' : '#666';
+        ctx.strokeStyle = isQPRound ? '#44ff44' : (isBoss ? '#ff4444' : '#666');
         ctx.lineWidth = 2;
         ctx.strokeRect(bx, by, btnW, btnH);
-
         ctx.fillStyle = '#fff';
         ctx.font = 'bold 16px monospace';
-        ctx.fillText(`R${r}`, bx + btnW / 2, by + 26);
+        ctx.fillText(`R${r}`, bx + btnW / 2, by + 22);
+        if (isBoss) {
+          ctx.fillStyle = isQPRound ? '#44ff44' : '#ff6644';
+          ctx.font = '10px monospace';
+          ctx.fillText(isQPRound ? 'QP' : 'BOSS', bx + btnW / 2, by + 40);
+        }
       }
     }
 
     // Close button
-    const closeBtnW = 120, closeBtnH = 36;
-    const closeBtnX = (W - closeBtnW) / 2;
-    const closeBtnY = startY + rows * (btnH + padY) + 20;
     ctx.fillStyle = '#444';
-    ctx.fillRect(closeBtnX, closeBtnY, closeBtnW, closeBtnH);
+    ctx.fillRect(W / 2 - 50, startY + rows * (btnH + gap) + 20, 100, 36);
     ctx.strokeStyle = '#888';
-    ctx.lineWidth = 2;
-    ctx.strokeRect(closeBtnX, closeBtnY, closeBtnW, closeBtnH);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(W / 2 - 50, startY + rows * (btnH + gap) + 20, 100, 36);
     ctx.fillStyle = '#fff';
     ctx.font = 'bold 14px monospace';
-    ctx.fillText('[X] CLOSE', closeBtnX + closeBtnW / 2, closeBtnY + 23);
+    ctx.fillText('CLOSE', W / 2, startY + rows * (btnH + gap) + 43);
   }
 }
 
@@ -3919,102 +4953,134 @@ function drawGameOver() {
   ctx.font = '20px monospace';
   ctx.fillText(`Reached Round ${round}`, W / 2, H / 2 + 40);
 
-  if (gameOverCooldown <= 0) {
+  if (gameOverPhase === 'showing' && leaderboardData.length > 0) {
+    const startY = H / 2 + 80;
+    ctx.fillStyle = '#ffcc00';
+    ctx.font = 'bold 18px monospace';
+    ctx.fillText('TOP SCORES', W / 2, startY);
+
+    const savedName = localStorage.getItem('eggthonyName') || '';
+    for (let i = 0; i < Math.min(leaderboardData.length, 10); i++) {
+      const e = leaderboardData[i];
+      const isPlayer = e.name === savedName && e.score === score && e.round === round;
+      ctx.fillStyle = isPlayer ? '#ffcc00' : '#ccc';
+      ctx.font = '14px monospace';
+      const rank = String(i + 1).padStart(2, ' ');
+      const nm = e.name.padEnd(16, ' ');
+      ctx.fillText(`${rank}. ${nm} ${e.score}  R${e.round}`, W / 2, startY + 22 + i * 18);
+    }
+  }
+
+  if (gameOverPhase === 'showing') {
     titleBlink += 0.03;
     const alpha = 0.5 + 0.5 * Math.sin(titleBlink * 3);
     ctx.fillStyle = `rgba(255,255,255,${alpha})`;
     ctx.font = 'bold 22px monospace';
-    ctx.fillText(isMobile ? 'Tap to Restart' : 'Click to Restart', W / 2, H / 2 + 100);
+    ctx.fillText(isMobile ? 'Tap to Restart' : 'Click to Restart', W / 2, H - 60);
   }
 }
 
 // ============================================================
 // CLICK HANDLER (state transitions)
 // ============================================================
+function handleDevMenuClick(cx, cy) {
+  // Hit-test round buttons
+  const cols = 5, rows = 3;
+  const btnW = 70, btnH = 50, gap = 10;
+  const gridW = cols * btnW + (cols - 1) * gap;
+  const startX = (W - gridW) / 2;
+  const startY = 110;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const r = row * cols + col + 1;
+      const bx = startX + col * (btnW + gap);
+      const by = startY + row * (btnH + gap);
+      if (cx >= bx && cx <= bx + btnW && cy >= by && cy <= by + btnH) {
+        // Start game at selected round
+        devMenuOpen = false;
+        gameState = 'playing';
+        playVoice('start', true);
+        musicClip.currentTime = 0;
+        musicClip.play().catch(() => {});
+        score = 0;
+        round = r;
+        enemies = [];
+        enemyProjectiles = [];
+        lightningBolts = [];
+        particles = [];
+        damageNumbers = [];
+        metalHat = null;
+        hatSpawnTimer = 15 + Math.random() * 10;
+        smoothie = null;
+        smoothieSpawnTimer = 20 + Math.random() * 10;
+        wingsItem = null;
+        wingsSpawnTimer = 25 + Math.random() * 15;
+        poopBombs = [];
+        chestplateItem = null;
+        chestplateSpawnTimer = 30 + Math.random() * 15;
+        dwyer = null;
+        boss = null;
+        bossActive = false;
+        bossEntering = false;
+        bossDefeated = false;
+        bossHPBarFlash = 0;
+        snotRocket = null;
+        fartClouds = [];
+        floatingPlatforms = [];
+        occupiedSlots = new Set();
+        floatPlatSpawnTimer = 3.0;
+        currentThemeIndex = getThemeIndex(r);
+        themeFadeAlpha = 0;
+        themeFading = false;
+        themeAnnouncement = '';
+        initAmbientParticles();
+        initBgDetails();
+        resetPlayer();
+        startRound(r);
+        return true;
+      }
+    }
+  }
+  // Close button
+  const closeY = startY + rows * (btnH + gap) + 20;
+  if (cx >= W / 2 - 50 && cx <= W / 2 + 50 && cy >= closeY && cy <= closeY + 36) {
+    devMenuOpen = false;
+    return true;
+  }
+  return false;
+}
+
 canvas.addEventListener('click', (e) => {
   ensureAudio();
+
   if (gameState === 'title') {
-    // Convert click to canvas coordinates
+    // Convert click to canvas coords
     const rect = canvas.getBoundingClientRect();
     const cx = (e.clientX - rect.left) * (W / rect.width);
     const cy = (e.clientY - rect.top) * (H / rect.height);
 
+    // Dev menu open → handle button clicks
     if (devMenuOpen) {
-      // Dev menu hit testing
-      const cols = 5, rows = 3;
-      const btnW = 70, btnH = 40, padX = 12, padY = 10;
-      const gridW = cols * btnW + (cols - 1) * padX;
-      const startX = (W - gridW) / 2;
-      const startY = 110;
-
-      // Check round buttons
-      for (let row = 0; row < rows; row++) {
-        for (let col = 0; col < cols; col++) {
-          const r = row * cols + col + 1;
-          const bx = startX + col * (btnW + padX);
-          const by = startY + row * (btnH + padY);
-          if (cx >= bx && cx <= bx + btnW && cy >= by && cy <= by + btnH) {
-            // Start game at chosen round
-            devMenuOpen = false;
-            score = 0;
-            round = r;
-            enemies = [];
-            enemyProjectiles = [];
-            lightningBolts = [];
-            particles = [];
-            damageNumbers = [];
-            metalHat = null;
-            hatSpawnTimer = 15 + Math.random() * 10;
-            smoothie = null;
-            smoothieSpawnTimer = 20 + Math.random() * 10;
-            boss = null;
-            bossActive = false;
-            bossEntering = false;
-            bossDefeated = false;
-            bossHPBarFlash = 0;
-            snotRocket = null;
-            fartClouds = [];
-            floatingPlatforms = [];
-            occupiedSlots = new Set();
-            floatPlatSpawnTimer = 3.0;
-            currentThemeIndex = getThemeIndex(r);
-            themeFadeAlpha = 0;
-            themeFading = false;
-            themeAnnouncement = '';
-            initAmbientParticles();
-            initBgDetails();
-            resetPlayer();
-            gameState = 'playing';
-            startRound(r);
-            return;
-          }
-        }
-      }
-
-      // Check close button
-      const closeBtnW = 120, closeBtnH = 36;
-      const closeBtnX = (W - closeBtnW) / 2;
-      const closeBtnY = startY + rows * (btnH + padY) + 20;
-      if (cx >= closeBtnX && cx <= closeBtnX + closeBtnW && cy >= closeBtnY && cy <= closeBtnY + closeBtnH) {
-        devMenuOpen = false;
-      }
-      return; // consume click when dev menu is open
+      handleDevMenuClick(cx, cy);
+      return;
     }
 
-    // Secret dev menu activation: tap top-left corner 5 times
+    // Top-left 80x80 zone → dev menu tap counter
     if (cx < 80 && cy < 80) {
       devTapCount++;
-      devTapTimer = 2.0;
+      devTapTimer = 1.0;
       if (devTapCount >= 5) {
         devMenuOpen = true;
         devTapCount = 0;
       }
-      return; // consume click
+      return;
     }
 
-    // Normal game start
+    // Normal start
     gameState = 'playing';
     playVoice('start', true);
+    musicClip.currentTime = 0;
+    musicClip.play().catch(() => {});
     score = 0;
     round = 1;
     enemies = [];
@@ -4026,6 +5092,12 @@ canvas.addEventListener('click', (e) => {
     hatSpawnTimer = 15 + Math.random() * 10;
     smoothie = null;
     smoothieSpawnTimer = 20 + Math.random() * 10;
+    wingsItem = null;
+    wingsSpawnTimer = 25 + Math.random() * 15;
+    poopBombs = [];
+    chestplateItem = null;
+    chestplateSpawnTimer = 30 + Math.random() * 15;
+    dwyer = null;
     boss = null;
     bossActive = false;
     bossEntering = false;
@@ -4044,8 +5116,12 @@ canvas.addEventListener('click', (e) => {
     initBgDetails();
     resetPlayer();
     startRound(1);
-  } else if (gameState === 'gameOver' && gameOverCooldown <= 0) {
+  } else if (gameState === 'gameOver' && gameOverPhase === 'showing') {
+    hideNameInput();
+    gameOverPhase = 'waiting';
     gameState = 'playing';
+    musicClip.currentTime = 0;
+    musicClip.play().catch(() => {});
     score = 0;
     round = 1;
     enemies = [];
@@ -4057,6 +5133,12 @@ canvas.addEventListener('click', (e) => {
     hatSpawnTimer = 15 + Math.random() * 10;
     smoothie = null;
     smoothieSpawnTimer = 20 + Math.random() * 10;
+    wingsItem = null;
+    wingsSpawnTimer = 25 + Math.random() * 15;
+    poopBombs = [];
+    chestplateItem = null;
+    chestplateSpawnTimer = 30 + Math.random() * 15;
+    dwyer = null;
     boss = null;
     bossActive = false;
     bossEntering = false;
@@ -4142,7 +5224,12 @@ function update(dt) {
     shakeX = 0; shakeY = 0; shakeIntensity = 0;
   }
 
-  if (gameOverCooldown > 0) gameOverCooldown -= dt;
+  if (gameOverCooldown > 0) {
+    gameOverCooldown -= dt;
+    if (gameOverCooldown <= 0 && gameState === 'gameOver' && gameOverPhase === 'waiting') {
+      showNameInput();
+    }
+  }
 
   if (gameState === 'paused') return;
 
@@ -4155,6 +5242,10 @@ function update(dt) {
     updateSnotRocket(dt);
     updateMetalHat(dt);
     updateSmoothie(dt);
+    updateWings(dt);
+    updatePoopBombs(dt);
+    updateChestplate(dt);
+    updateDwyer(dt);
     updateWaves(dt);
     updateFloatingPlatforms(dt);
 
@@ -4162,6 +5253,8 @@ function update(dt) {
     if (player.hp <= 0) {
       gameState = 'gameOver';
       gameOverCooldown = 1.5;
+      musicClip.pause();
+      dwyer = null;
       spawnParticles(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, '#f5e6c8', 30, 300, 1.0);
       addShake(12, 0.4);
       playSound('gameOver');
@@ -4209,13 +5302,17 @@ function draw() {
   } else {
     drawMetalHat();
     drawSmoothie();
+    drawWings();
+    drawChestplate();
     drawEnemies();
+    drawDwyer();
     drawBoss();
     drawFartClouds();
     drawPlayer();
     drawSnotCharging();
     drawLightning();
     drawSnotRocket();
+    drawPoopBombs();
     drawParticles();
     drawDamageNumbers();
     drawHUD();
