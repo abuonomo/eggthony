@@ -285,6 +285,10 @@ snotSniffleClip.loop = true;
 const snotLaunchClip = new Audio(encodeURI('data/sounds/Snot rocket launch.m4a'));
 snotLaunchClip.preload = 'auto';
 
+// Dwyer entrance sound
+const dwyerClip = new Audio(encodeURI('data/sounds/dwyer.m4a'));
+dwyerClip.preload = 'auto';
+
 // Background music
 const musicClip = new Audio(encodeURI('data/sounds/music.m4a'));
 musicClip.preload = 'auto';
@@ -395,13 +399,17 @@ let spitterSprite = null, spitterSpriteLoaded = false;
 let bruteSprite = null, bruteSpriteLoaded = false;
 let metalHatSprite = null, metalHatSpriteLoaded = false;
 let smoothieSprite = null, smoothieSpriteLoaded = false;
+let dwyerSprite = null, dwyerSpriteLoaded = false;
+let chestplateSprite = null, chestplateSpriteLoaded = false;
 
 const spriteFiles = [
-  ['data/grunt.png',     (s) => { gruntSprite = s; gruntSpriteLoaded = true; }],
-  ['data/spitter.png',   (s) => { spitterSprite = s; spitterSpriteLoaded = true; }],
-  ['data/brute.png',     (s) => { bruteSprite = s; bruteSpriteLoaded = true; }],
-  ['data/metal_hat.png', (s) => { metalHatSprite = s; metalHatSpriteLoaded = true; }],
-  ['data/smoothie.png',  (s) => { smoothieSprite = s; smoothieSpriteLoaded = true; }],
+  ['data/grunt.png',           (s) => { gruntSprite = s; gruntSpriteLoaded = true; }],
+  ['data/spitter.png',         (s) => { spitterSprite = s; spitterSpriteLoaded = true; }],
+  ['data/brute.png',           (s) => { bruteSprite = s; bruteSpriteLoaded = true; }],
+  ['data/metal_hat.png',       (s) => { metalHatSprite = s; metalHatSpriteLoaded = true; }],
+  ['data/smoothie.png',        (s) => { smoothieSprite = s; smoothieSpriteLoaded = true; }],
+  ['data/dwyer_soldier.png',   (s) => { dwyerSprite = s; dwyerSpriteLoaded = true; }],
+  ['data/chesplate.png',       (s) => { chestplateSprite = s; chestplateSpriteLoaded = true; }],
 ];
 for (const [src, cb] of spriteFiles) {
   const raw = new Image();
@@ -829,6 +837,16 @@ const POOP_AOE_RADIUS = 90;
 const POOP_COOLDOWN = 0.45;
 const POOP_SIZE = 12;
 const POOP_GRAVITY = 800;
+
+const DWYER_DURATION = 10;
+const CHESTPLATE_SIZE = 40;
+const DWYER_W = 90, DWYER_H = 130;
+const DWYER_SPEED = 240;
+const DWYER_ATTACK_RANGE = 70;
+const DWYER_ATTACK_DAMAGE = 18;
+const DWYER_ATTACK_COOLDOWN = 0.6;
+const DWYER_LANDING_AOE_RADIUS = 200;
+const DWYER_LANDING_DAMAGE = 35;
 
 const PLAYER_MAX_HP = 100;
 const IFRAME_DURATION = 0.8;
@@ -3725,6 +3743,423 @@ function drawPoopBombs() {
 }
 
 // ============================================================
+// CHESTPLATE POWERUP + DWYER ALLY
+// ============================================================
+let chestplateItem = null;
+let chestplateSpawnTimer = 30 + Math.random() * 15;
+let dwyer = null;
+
+function spawnChestplate() {
+  const x = PLATFORM_X + 40 + Math.random() * (PLATFORM_W - 80);
+  chestplateItem = {
+    x,
+    y: -CHESTPLATE_SIZE,
+    vy: 55 + Math.random() * 40,
+    bobTimer: Math.random() * Math.PI * 2,
+    landed: false,
+    landY: 0
+  };
+}
+
+function updateChestplate(dt) {
+  if (!chestplateItem) {
+    chestplateSpawnTimer -= dt;
+    if (chestplateSpawnTimer <= 0 && round >= 4 && !dwyer && (enemies.length > 0 || (boss && !boss.dying))) {
+      chestplateSpawnTimer = 30 + Math.random() * 15;
+      spawnChestplate();
+    }
+    return;
+  }
+
+  const c = chestplateItem;
+
+  if (!c.landed) {
+    c.y += c.vy * dt;
+    if (c.y + CHESTPLATE_SIZE >= PLATFORM_Y) {
+      c.y = PLATFORM_Y - CHESTPLATE_SIZE;
+      c.landed = true;
+      c.landY = c.y;
+    }
+  } else {
+    c.bobTimer += dt * 3;
+    c.y = c.landY + Math.sin(c.bobTimer) * 3;
+  }
+
+  // Pickup collision
+  if (rectsOverlap(player.x, player.y, PLAYER_W, PLAYER_H, c.x - 4, c.y - 4, CHESTPLATE_SIZE + 8, CHESTPLATE_SIZE + 8)) {
+    dwyer = createDwyer();
+    chestplateItem = null;
+    const pcx = player.x + PLAYER_W / 2;
+    const pcy = player.y + PLAYER_H / 2;
+    spawnParticles(pcx, pcy, '#ddaa44', 12, 120, 0.4);
+    addShake(3, 0.1);
+    dwyerClip.currentTime = 0;
+    dwyerClip.play().catch(() => {});
+    playSound('roundStart');
+  }
+}
+
+function drawChestplate() {
+  if (!chestplateItem) return;
+  const c = chestplateItem;
+  const x = c.x;
+  const y = c.y;
+  const sz = CHESTPLATE_SIZE;
+
+  ctx.save();
+  ctx.shadowColor = '#ddaa44';
+  ctx.shadowBlur = 15;
+
+  if (chestplateSpriteLoaded) {
+    ctx.drawImage(chestplateSprite, x, y, sz, sz);
+  } else {
+    // Procedural fallback — golden chestplate
+    const glowAlpha = 0.3 + 0.15 * Math.sin(performance.now() * 0.005);
+    ctx.fillStyle = '#bb8833';
+    ctx.fillRect(x + 4, y + 6, sz - 8, sz - 10);
+    ctx.fillStyle = '#ddaa44';
+    ctx.fillRect(x + 6, y + 8, sz - 12, sz - 14);
+    ctx.fillStyle = `rgba(255,220,120,${glowAlpha})`;
+    ctx.fillRect(x + 8, y + 10, 5, 6);
+  }
+
+  ctx.restore();
+}
+
+function createDwyer() {
+  // Pick a landing X near center of platform (avoid edges)
+  const landX = PLATFORM_X + 60 + Math.random() * (PLATFORM_W - 120);
+  return {
+    x: landX,
+    y: -DWYER_H - 60,   // start way above screen
+    vx: 0,
+    vy: 0,
+    w: DWYER_W,
+    h: DWYER_H,
+    timer: DWYER_DURATION,
+    facingRight: player.facingRight || true,
+    attackCooldown: 0,
+    attacking: false,
+    attackTimer: 0,
+    onPlatform: false,
+    // Dramatic entrance state
+    entering: true,
+    landingShockwave: 0,  // 0 = not yet, >0 = expanding ring timer
+    entryTrailTimer: 0
+  };
+}
+
+function dwyerLandingAOE() {
+  const cx = dwyer.x + dwyer.w / 2;
+  const cy = PLATFORM_Y;
+
+  // Massive screen shake
+  addShake(18, 0.5);
+  playSound('slam');
+  playNoise(0.3, 0.25);
+
+  // Huge particle explosion — gold, red, white
+  spawnParticles(cx, cy, '#ffdd44', 35, 300, 0.8);
+  spawnParticles(cx, cy, '#cc3333', 25, 250, 0.7);
+  spawnParticles(cx, cy, '#ffffff', 15, 200, 0.5);
+  // Ground dust ring
+  for (let i = 0; i < 20; i++) {
+    const angle = (i / 20) * Math.PI * 2;
+    const speed = 150 + Math.random() * 200;
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed * 0.4 - 60,
+      life: 0.7, maxLife: 0.7,
+      color: Math.random() < 0.5 ? '#ddaa44' : '#aa7733',
+      size: 3 + Math.random() * 4
+    });
+  }
+
+  // Damage all enemies in AOE
+  for (let i = enemies.length - 1; i >= 0; i--) {
+    const e = enemies[i];
+    if (e.dying) continue;
+    const ex = e.x + e.w / 2;
+    const ey = e.y + e.h / 2;
+    const dist = Math.hypot(ex - cx, ey - cy);
+    if (dist < DWYER_LANDING_AOE_RADIUS) {
+      const knockDir = ex > cx ? 1 : -1;
+      const knockScale = 1 - dist / DWYER_LANDING_AOE_RADIUS;
+      damageEnemy(i, DWYER_LANDING_DAMAGE, knockDir * 300 * knockScale, -200 * knockScale);
+    }
+  }
+
+  // Damage boss in AOE
+  if (boss && !boss.dying && boss.state !== 'entering') {
+    const bx = boss.x + boss.w / 2;
+    const by = boss.y + boss.h / 2;
+    const dist = Math.hypot(bx - cx, by - cy);
+    if (dist < DWYER_LANDING_AOE_RADIUS) {
+      const knockDir = bx > cx ? 1 : -1;
+      damageBoss(DWYER_LANDING_DAMAGE, knockDir * 200, 0);
+    }
+  }
+
+  // Start shockwave ring visual
+  dwyer.landingShockwave = 0.5;
+  dwyer.shockwaveX = cx;
+  dwyer.shockwaveY = cy;
+}
+
+function updateDwyer(dt) {
+  if (!dwyer) return;
+
+  // Shockwave ring timer (visual only, ticks even during entering)
+  if (dwyer.landingShockwave > 0) {
+    dwyer.landingShockwave -= dt;
+  }
+
+  // === ENTERING STATE: falling from sky ===
+  if (dwyer.entering) {
+    // Accelerate downward (fast dramatic drop)
+    dwyer.vy += 2800 * dt;
+    dwyer.y += dwyer.vy * dt;
+
+    // Trail particles while falling
+    dwyer.entryTrailTimer -= dt;
+    if (dwyer.entryTrailTimer <= 0 && dwyer.y > -DWYER_H) {
+      dwyer.entryTrailTimer = 0.02;
+      const cx = dwyer.x + dwyer.w / 2;
+      particles.push({
+        x: cx + (Math.random() - 0.5) * 20,
+        y: dwyer.y + dwyer.h,
+        vx: (Math.random() - 0.5) * 40,
+        vy: -80 - Math.random() * 60,
+        life: 0.35, maxLife: 0.35,
+        color: Math.random() < 0.5 ? '#ffdd44' : '#ff6633',
+        size: 3 + Math.random() * 3
+      });
+    }
+
+    // Land on platform
+    if (dwyer.y + dwyer.h >= PLATFORM_Y) {
+      dwyer.y = PLATFORM_Y - dwyer.h;
+      dwyer.vy = 0;
+      dwyer.onPlatform = true;
+      dwyer.entering = false;
+      dwyerLandingAOE();
+    }
+    return;
+  }
+
+  dwyer.timer -= dt;
+  if (dwyer.timer <= 0) {
+    // Despawn with poof particles
+    spawnParticles(dwyer.x + dwyer.w / 2, dwyer.y + dwyer.h / 2, '#ddaa44', 15, 150, 0.5);
+    spawnParticles(dwyer.x + dwyer.w / 2, dwyer.y + dwyer.h / 2, '#cc3333', 8, 100, 0.4);
+    dwyer = null;
+    return;
+  }
+
+  // Attack cooldown
+  if (dwyer.attackCooldown > 0) dwyer.attackCooldown -= dt;
+  if (dwyer.attackTimer > 0) dwyer.attackTimer -= dt;
+
+  // Gravity
+  dwyer.vy += 1400 * dt;
+  dwyer.y += dwyer.vy * dt;
+
+  // Land on main platform
+  if (dwyer.y + dwyer.h >= PLATFORM_Y) {
+    dwyer.y = PLATFORM_Y - dwyer.h;
+    dwyer.vy = 0;
+    dwyer.onPlatform = true;
+  }
+
+  // Find nearest target (enemy or boss)
+  let targetX = null;
+  let targetY = null;
+  let targetDist = Infinity;
+  let targetIsEnemy = false;
+  let targetIndex = -1;
+
+  for (let i = 0; i < enemies.length; i++) {
+    const e = enemies[i];
+    if (e.dying) continue;
+    const ex = e.x + e.w / 2;
+    const ey = e.y + e.h / 2;
+    const dist = Math.abs(ex - (dwyer.x + dwyer.w / 2));
+    if (dist < targetDist) {
+      targetDist = dist;
+      targetX = ex;
+      targetY = ey;
+      targetIsEnemy = true;
+      targetIndex = i;
+    }
+  }
+
+  if (boss && !boss.dying && boss.state !== 'entering') {
+    const bx = boss.x + boss.w / 2;
+    const dist = Math.abs(bx - (dwyer.x + dwyer.w / 2));
+    if (dist < targetDist) {
+      targetDist = dist;
+      targetX = bx;
+      targetY = boss.y + boss.h / 2;
+      targetIsEnemy = false;
+      targetIndex = -1;
+    }
+  }
+
+  // Movement: follow player if no target nearby, or approach target
+  const dwyerCx = dwyer.x + dwyer.w / 2;
+  if (targetX !== null && targetDist < 300) {
+    // Move toward target
+    if (targetDist > DWYER_ATTACK_RANGE) {
+      const dir = targetX > dwyerCx ? 1 : -1;
+      dwyer.vx = dir * DWYER_SPEED;
+      dwyer.facingRight = dir > 0;
+    } else {
+      // In attack range — stop and attack
+      dwyer.vx = 0;
+      dwyer.facingRight = targetX > dwyerCx;
+
+      if (dwyer.attackCooldown <= 0) {
+        dwyer.attacking = true;
+        dwyer.attackTimer = 0.3;
+        dwyer.attackCooldown = DWYER_ATTACK_COOLDOWN;
+
+        if (targetIsEnemy && targetIndex >= 0) {
+          const e = enemies[targetIndex];
+          const knockDir = e.x + e.w / 2 > dwyerCx ? 1 : -1;
+          damageEnemy(targetIndex, DWYER_ATTACK_DAMAGE, knockDir * 150, -80);
+        } else if (boss && !boss.dying) {
+          const knockDir = boss.x + boss.w / 2 > dwyerCx ? 1 : -1;
+          damageBoss(DWYER_ATTACK_DAMAGE, knockDir * 100, 0);
+        }
+
+        playSound('punch');
+        spawnParticles(
+          dwyerCx + (dwyer.facingRight ? 30 : -30),
+          dwyer.y + dwyer.h * 0.4,
+          '#ffcc44', 5, 80, 0.2
+        );
+      }
+    }
+  } else {
+    // Follow player
+    const playerCx = player.x + PLAYER_W / 2;
+    const followDist = Math.abs(playerCx - dwyerCx);
+    if (followDist > 50) {
+      const dir = playerCx > dwyerCx ? 1 : -1;
+      dwyer.vx = dir * DWYER_SPEED;
+      dwyer.facingRight = dir > 0;
+    } else {
+      dwyer.vx = 0;
+    }
+  }
+
+  dwyer.x += dwyer.vx * dt;
+
+  // Clamp to platform edges
+  if (dwyer.x < PLATFORM_X) dwyer.x = PLATFORM_X;
+  if (dwyer.x + dwyer.w > PLATFORM_X + PLATFORM_W) dwyer.x = PLATFORM_X + PLATFORM_W - dwyer.w;
+}
+
+function drawDwyer() {
+  if (!dwyer) return;
+
+  // Blink warning when about to expire (not during entering)
+  if (!dwyer.entering && dwyer.timer < 2 && Math.floor(dwyer.timer * 8) % 2 === 0) return;
+
+  ctx.save();
+
+  const dx = dwyer.x;
+  const dy = dwyer.y;
+
+  // Entry drop: draw speed lines behind Dwyer while falling
+  if (dwyer.entering && dwyer.y > -DWYER_H) {
+    ctx.save();
+    const trailAlpha = Math.min(1, dwyer.vy / 600);
+    ctx.strokeStyle = `rgba(255,200,60,${trailAlpha * 0.6})`;
+    ctx.lineWidth = 3;
+    const cx = dx + dwyer.w / 2;
+    for (let i = -2; i <= 2; i++) {
+      ctx.beginPath();
+      ctx.moveTo(cx + i * 12, dy - 5);
+      ctx.lineTo(cx + i * 12, dy - 40 - Math.random() * 30);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Draw sprite or procedural fallback
+  if (dwyerSpriteLoaded) {
+    ctx.save();
+    if (!dwyer.facingRight) {
+      ctx.translate(dx + dwyer.w, dy);
+      ctx.scale(-1, 1);
+      ctx.drawImage(dwyerSprite, 0, 0, dwyer.w, dwyer.h);
+    } else {
+      ctx.drawImage(dwyerSprite, dx, dy, dwyer.w, dwyer.h);
+    }
+    ctx.restore();
+  } else {
+    // Procedural fallback — cube-ish Roman soldier
+    ctx.fillStyle = '#cc3333';
+    ctx.fillRect(dx + 12, dy + 12, dwyer.w - 24, dwyer.h - 24);
+    ctx.fillStyle = '#ddaa44';
+    ctx.fillRect(dx + 18, dy + 5, dwyer.w - 36, 20); // helmet
+    ctx.fillStyle = '#fff';
+    const eyeX = dwyer.facingRight ? dx + dwyer.w - 30 : dx + 18;
+    ctx.fillRect(eyeX, dy + 38, 10, 10);
+  }
+
+  // Sword slash visual
+  if (dwyer.attackTimer > 0) {
+    const slashAlpha = dwyer.attackTimer / 0.3;
+    const slashX = dwyer.facingRight ? dx + dwyer.w : dx;
+    const slashDir = dwyer.facingRight ? 1 : -1;
+    ctx.strokeStyle = `rgba(255,220,100,${slashAlpha})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    const angle = (1 - dwyer.attackTimer / 0.3) * Math.PI * 0.8 - Math.PI * 0.4;
+    ctx.arc(slashX, dy + dwyer.h * 0.4, 45, angle - 0.5 * slashDir, angle + 0.5 * slashDir);
+    ctx.stroke();
+    // Second thicker arc
+    ctx.strokeStyle = `rgba(255,255,200,${slashAlpha * 0.5})`;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.arc(slashX, dy + dwyer.h * 0.4, 36, angle - 0.35 * slashDir, angle + 0.35 * slashDir);
+    ctx.stroke();
+  }
+
+  // Landing shockwave ring
+  if (dwyer.landingShockwave > 0) {
+    const t = 1 - dwyer.landingShockwave / 0.5; // 0→1 as ring expands
+    const radius = DWYER_LANDING_AOE_RADIUS * t;
+    const alpha = (1 - t) * 0.8;
+    ctx.save();
+    // Outer ring
+    ctx.strokeStyle = `rgba(255,200,60,${alpha})`;
+    ctx.lineWidth = 4 + (1 - t) * 6;
+    ctx.beginPath();
+    ctx.arc(dwyer.shockwaveX, dwyer.shockwaveY, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    // Inner glow ring
+    ctx.strokeStyle = `rgba(255,255,200,${alpha * 0.5})`;
+    ctx.lineWidth = 2 + (1 - t) * 3;
+    ctx.beginPath();
+    ctx.arc(dwyer.shockwaveX, dwyer.shockwaveY, radius * 0.6, 0, Math.PI * 2);
+    ctx.stroke();
+    // Ground flash
+    if (t < 0.3) {
+      const flashAlpha = (0.3 - t) / 0.3 * 0.4;
+      ctx.fillStyle = `rgba(255,220,100,${flashAlpha})`;
+      ctx.fillRect(dwyer.shockwaveX - DWYER_LANDING_AOE_RADIUS, dwyer.shockwaveY - 8, DWYER_LANDING_AOE_RADIUS * 2, 16);
+    }
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+
+// ============================================================
 // WAVE SYSTEM
 // ============================================================
 let waveEnemiesRemaining = 0;
@@ -3916,6 +4351,29 @@ function drawHUD() {
     ctx.fillText('WINGS', W / 2, wby + 10);
   }
 
+  // Dwyer ally indicator
+  if (dwyer) {
+    const dBarW = 100;
+    const dBarH = 10;
+    const dbx = W / 2 - dBarW / 2;
+    let dby = 50;
+    if (player.metalTimer > 0) dby += 14;
+    if (player.muscleTimer > 0) dby += 14;
+    if (player.wingsTimer > 0) dby += 14;
+    const dRatio = dwyer.timer / DWYER_DURATION;
+    ctx.fillStyle = '#332200';
+    ctx.fillRect(dbx, dby, dBarW, dBarH);
+    ctx.fillStyle = dRatio < 0.3 ? '#886633' : '#ddaa44';
+    ctx.fillRect(dbx, dby, dBarW * dRatio, dBarH);
+    ctx.strokeStyle = '#ddaa44';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(dbx, dby, dBarW, dBarH);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillStyle = '#ffddaa';
+    ctx.fillText('DWYER', W / 2, dby + 10);
+  }
+
   // Snot rocket cooldown / charge indicator
   if (player.snotHolding) {
     // Show charge bar while holding
@@ -4101,6 +4559,9 @@ canvas.addEventListener('click', () => {
     wingsItem = null;
     wingsSpawnTimer = 25 + Math.random() * 15;
     poopBombs = [];
+    chestplateItem = null;
+    chestplateSpawnTimer = 30 + Math.random() * 15;
+    dwyer = null;
     boss = null;
     bossActive = false;
     bossEntering = false;
@@ -4136,6 +4597,9 @@ canvas.addEventListener('click', () => {
     wingsItem = null;
     wingsSpawnTimer = 25 + Math.random() * 15;
     poopBombs = [];
+    chestplateItem = null;
+    chestplateSpawnTimer = 30 + Math.random() * 15;
+    dwyer = null;
     boss = null;
     bossActive = false;
     bossEntering = false;
@@ -4228,6 +4692,8 @@ function update(dt) {
     updateSmoothie(dt);
     updateWings(dt);
     updatePoopBombs(dt);
+    updateChestplate(dt);
+    updateDwyer(dt);
     updateWaves(dt);
     updateFloatingPlatforms(dt);
 
@@ -4236,6 +4702,7 @@ function update(dt) {
       gameState = 'gameOver';
       gameOverCooldown = 1.5;
       musicClip.pause();
+      dwyer = null;
       spawnParticles(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, '#f5e6c8', 30, 300, 1.0);
       addShake(12, 0.4);
       playSound('gameOver');
@@ -4284,7 +4751,9 @@ function draw() {
     drawMetalHat();
     drawSmoothie();
     drawWings();
+    drawChestplate();
     drawEnemies();
+    drawDwyer();
     drawBoss();
     drawPlayer();
     drawSnotCharging();
