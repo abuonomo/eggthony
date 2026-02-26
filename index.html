@@ -409,10 +409,13 @@ for (const [src, cb] of spriteFiles) {
   raw.src = src;
 }
 
-const wingsSprite = new Image();
-wingsSprite.src = 'data/wings_eggthony.png';
+let wingsSprite = null;
 let wingsSpriteLoaded = false;
-wingsSprite.onload = () => { wingsSpriteLoaded = true; };
+{
+  const raw = new Image();
+  raw.onload = () => removeWhiteBG(raw, (s) => { wingsSprite = s; wingsSpriteLoaded = true; });
+  raw.src = 'data/eggthony_wings.png';
+}
 
 let wingsPowerupSprite = null, wingsPowerupSpriteLoaded = false;
 {
