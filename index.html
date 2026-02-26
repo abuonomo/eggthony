@@ -288,7 +288,8 @@ const voiceClips = {
   good2: new Audio(encodeURI('data/sounds/Good - hammanado.m4a')),
   lose: new Audio(encodeURI('data/sounds/Lose - eh maybe next time.m4a')),
   win: new Audio(encodeURI('data/sounds/Win \u2014 let\u2019s freaking go boys.m4a')),
-  start: new Audio(encodeURI('data/sounds/Start game trimmed.m4a'))
+  start: new Audio(encodeURI('data/sounds/Start game trimmed.m4a')),
+  boss: new Audio(encodeURI('data/sounds/Boss_eat_trimmed.m4a'))
 };
 const snotSniffleClip = new Audio(encodeURI('data/sounds/Snot rocket sniffle.m4a'));
 snotSniffleClip.preload = 'auto';
@@ -4266,6 +4267,7 @@ function startRound(r) {
     bossEntering = true;
     bossDefeated = false;
     playSound('bossRoar');
+    playVoice('boss', true);
   } else {
     waveEnemiesTotal = 3 + r * 3;
     waveEnemiesSpawned = 0;
