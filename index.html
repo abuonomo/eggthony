@@ -294,23 +294,50 @@ evilSprite.src = 'data/evil_eggthony.png';
 let evilSpriteLoaded = false;
 evilSprite.onload = () => { evilSpriteLoaded = true; };
 
-// Strip white backgrounds from sprites (pixels with R/G/B all >= 240 → transparent)
+// Strip white backgrounds from sprites and auto-crop to tight bounding box
 function removeWhiteBG(img, callback) {
   const c = document.createElement('canvas');
-  c.width = img.naturalWidth;
-  c.height = img.naturalHeight;
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  c.width = w;
+  c.height = h;
   const cx = c.getContext('2d');
   cx.drawImage(img, 0, 0);
-  const id = cx.getImageData(0, 0, c.width, c.height);
+  const id = cx.getImageData(0, 0, w, h);
   const d = id.data;
+  // Remove white/near-white pixels
   for (let i = 0; i < d.length; i += 4) {
     if (d[i] >= 240 && d[i + 1] >= 240 && d[i + 2] >= 240) d[i + 3] = 0;
   }
+  // Find tight bounding box of non-transparent pixels
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (d[(y * w + x) * 4 + 3] > 0) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  // Crop to bounding box
+  const cropW = maxX - minX + 1;
+  const cropH = maxY - minY + 1;
   cx.putImageData(id, 0, 0);
+  const cropped = cx.getImageData(minX, minY, cropW, cropH);
+  const c2 = document.createElement('canvas');
+  c2.width = cropW;
+  c2.height = cropH;
+  c2.getContext('2d').putImageData(cropped, 0, 0);
   const out = new Image();
   out.onload = () => callback(out);
-  out.src = c.toDataURL();
+  out.src = c2.toDataURL();
 }
+
+// Reusable offscreen canvas for sprite flash effects
+const flashCanvas = document.createElement('canvas');
+const flashCtx = flashCanvas.getContext('2d');
 
 // Enemy & powerup sprites (white-BG stripped at load time)
 let gruntSprite = null, gruntSpriteLoaded = false;
@@ -2639,8 +2666,8 @@ const ENEMY_TYPES = {
     color: '#44cc44',
     eyeColor: '#ff0000',
     baseHp: 40,
-    baseW: 32,
-    baseH: 36,
+    baseW: 56,
+    baseH: 64,
     speed: 80,
     damage: 10,
     score: 100
@@ -2649,8 +2676,8 @@ const ENEMY_TYPES = {
     color: '#cc44cc',
     eyeColor: '#ffff00',
     baseHp: 30,
-    baseW: 28,
-    baseH: 32,
+    baseW: 48,
+    baseH: 56,
     speed: 50,
     damage: 8,
     score: 150,
@@ -2662,8 +2689,8 @@ const ENEMY_TYPES = {
     color: '#cc6622',
     eyeColor: '#ff4444',
     baseHp: 120,
-    baseW: 48,
-    baseH: 52,
+    baseW: 72,
+    baseH: 80,
     speed: 120,
     damage: 25,
     score: 300,
@@ -2963,13 +2990,22 @@ function drawEnemies() {
       }
       const drawX = cx - drawW / 2;
       const drawY = e.y + e.h - drawH; // feet aligned
-      ctx.drawImage(spr, drawX, drawY, drawW, drawH);
 
-      // Flash white on hit
       if (e.flashTimer > 0) {
-        ctx.globalCompositeOperation = 'source-atop';
-        ctx.fillStyle = `rgba(255,255,255,${e.flashTimer * 5})`;
-        ctx.fillRect(drawX, drawY, drawW, drawH);
+        // Use offscreen canvas so flash only affects sprite pixels
+        const fw = Math.ceil(drawW);
+        const fh = Math.ceil(drawH);
+        if (flashCanvas.width < fw) flashCanvas.width = fw;
+        if (flashCanvas.height < fh) flashCanvas.height = fh;
+        flashCtx.clearRect(0, 0, flashCanvas.width, flashCanvas.height);
+        flashCtx.globalCompositeOperation = 'source-over';
+        flashCtx.drawImage(spr, 0, 0, fw, fh);
+        flashCtx.globalCompositeOperation = 'source-atop';
+        flashCtx.fillStyle = `rgba(255,255,255,${e.flashTimer * 5})`;
+        flashCtx.fillRect(0, 0, fw, fh);
+        ctx.drawImage(flashCanvas, 0, 0, fw, fh, drawX, drawY, drawW, drawH);
+      } else {
+        ctx.drawImage(spr, drawX, drawY, drawW, drawH);
       }
       ctx.restore();
     } else {
@@ -3084,7 +3120,7 @@ function damageEnemy(index, damage, knockX, knockY) {
 // METAL HAT POWERUP
 // ============================================================
 const METAL_DURATION = 7;
-const HAT_SIZE = 20;
+const HAT_SIZE = 40;
 let metalHat = null;
 let hatSpawnTimer = 0;
 
@@ -3176,7 +3212,7 @@ function drawMetalHat() {
 // BLUEBERRY SMOOTHIE POWERUP
 // ============================================================
 const MUSCLE_DURATION = 6;
-const SMOOTHIE_SIZE = 18;
+const SMOOTHIE_SIZE = 36;
 let smoothie = null;
 let smoothieSpawnTimer = 20 + Math.random() * 10;
 
