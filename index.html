@@ -294,6 +294,44 @@ evilSprite.src = 'data/evil_eggthony.png';
 let evilSpriteLoaded = false;
 evilSprite.onload = () => { evilSpriteLoaded = true; };
 
+// Strip white backgrounds from sprites (pixels with R/G/B all >= 240 → transparent)
+function removeWhiteBG(img, callback) {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth;
+  c.height = img.naturalHeight;
+  const cx = c.getContext('2d');
+  cx.drawImage(img, 0, 0);
+  const id = cx.getImageData(0, 0, c.width, c.height);
+  const d = id.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i] >= 240 && d[i + 1] >= 240 && d[i + 2] >= 240) d[i + 3] = 0;
+  }
+  cx.putImageData(id, 0, 0);
+  const out = new Image();
+  out.onload = () => callback(out);
+  out.src = c.toDataURL();
+}
+
+// Enemy & powerup sprites (white-BG stripped at load time)
+let gruntSprite = null, gruntSpriteLoaded = false;
+let spitterSprite = null, spitterSpriteLoaded = false;
+let bruteSprite = null, bruteSpriteLoaded = false;
+let metalHatSprite = null, metalHatSpriteLoaded = false;
+let smoothieSprite = null, smoothieSpriteLoaded = false;
+
+const spriteFiles = [
+  ['data/grunt.png',     (s) => { gruntSprite = s; gruntSpriteLoaded = true; }],
+  ['data/spitter.png',   (s) => { spitterSprite = s; spitterSpriteLoaded = true; }],
+  ['data/brute.png',     (s) => { bruteSprite = s; bruteSpriteLoaded = true; }],
+  ['data/metal_hat.png', (s) => { metalHatSprite = s; metalHatSpriteLoaded = true; }],
+  ['data/smoothie.png',  (s) => { smoothieSprite = s; smoothieSpriteLoaded = true; }],
+];
+for (const [src, cb] of spriteFiles) {
+  const raw = new Image();
+  raw.onload = () => removeWhiteBG(raw, cb);
+  raw.src = src;
+}
+
 // ============================================================
 // INPUT
 // ============================================================
@@ -2633,6 +2671,13 @@ const ENEMY_TYPES = {
   }
 };
 
+function getEnemySprite(type) {
+  if (type === 'grunt' && gruntSpriteLoaded) return gruntSprite;
+  if (type === 'spitter' && spitterSpriteLoaded) return spitterSprite;
+  if (type === 'brute' && bruteSpriteLoaded) return bruteSprite;
+  return null;
+}
+
 function createEnemy(type, round) {
   const def = ENEMY_TYPES[type];
   const hpBonus = (round - 1) * 15;
@@ -2900,32 +2945,64 @@ function drawEnemies() {
     const cx = e.x + e.w / 2;
     const cy = e.y + e.h / 2;
 
-    // Body
-    ctx.fillStyle = e.flashTimer > 0 ? '#ffffff' : e.color;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy + e.h * 0.1, e.w / 2, e.h / 2, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Eyes
-    if (!e.dying) {
-      ctx.fillStyle = e.eyeColor;
-      const eyeOff = e.facingRight ? e.w * 0.1 : -e.w * 0.1;
-      const eyeSize = Math.max(2, e.w * 0.1);
-      ctx.fillRect(cx + eyeOff - eyeSize * 1.2, cy - e.h * 0.15, eyeSize, eyeSize);
-      ctx.fillRect(cx + eyeOff + eyeSize * 0.3, cy - e.h * 0.15, eyeSize, eyeSize);
-
-      // Mouth
-      ctx.fillStyle = '#000';
-      ctx.fillRect(cx + eyeOff - eyeSize, cy + e.h * 0.05, eyeSize * 2, eyeSize * 0.5);
-
-      // Walking animation (bouncing legs)
-      if (e.onPlatform && Math.abs(e.vx) > 1) {
-        ctx.fillStyle = e.color;
-        const legBob = Math.sin(e.animTimer * 5) * 3;
-        ctx.fillRect(cx - e.w * 0.25, e.y + e.h - 4 + legBob, e.w * 0.15, 6);
-        ctx.fillRect(cx + e.w * 0.1, e.y + e.h - 4 - legBob, e.w * 0.15, 6);
+    const spr = getEnemySprite(e.type);
+    if (spr) {
+      // --- Sprite-based drawing ---
+      ctx.save();
+      if (!e.facingRight) {
+        ctx.translate(cx, cy);
+        ctx.scale(-1, 1);
+        ctx.translate(-cx, -cy);
       }
+      // Aspect-ratio preservation, feet-aligned
+      let drawW = e.w;
+      let drawH = e.h;
+      if (spr.naturalWidth && spr.naturalHeight) {
+        const ratio = spr.naturalWidth / spr.naturalHeight;
+        drawW = e.h * ratio;
+      }
+      const drawX = cx - drawW / 2;
+      const drawY = e.y + e.h - drawH; // feet aligned
+      ctx.drawImage(spr, drawX, drawY, drawW, drawH);
 
+      // Flash white on hit
+      if (e.flashTimer > 0) {
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = `rgba(255,255,255,${e.flashTimer * 5})`;
+        ctx.fillRect(drawX, drawY, drawW, drawH);
+      }
+      ctx.restore();
+    } else {
+      // --- Procedural fallback ---
+      ctx.fillStyle = e.flashTimer > 0 ? '#ffffff' : e.color;
+      ctx.beginPath();
+      ctx.ellipse(cx, cy + e.h * 0.1, e.w / 2, e.h / 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (!e.dying) {
+        // Eyes
+        ctx.fillStyle = e.eyeColor;
+        const eyeOff = e.facingRight ? e.w * 0.1 : -e.w * 0.1;
+        const eyeSize = Math.max(2, e.w * 0.1);
+        ctx.fillRect(cx + eyeOff - eyeSize * 1.2, cy - e.h * 0.15, eyeSize, eyeSize);
+        ctx.fillRect(cx + eyeOff + eyeSize * 0.3, cy - e.h * 0.15, eyeSize, eyeSize);
+
+        // Mouth
+        ctx.fillStyle = '#000';
+        ctx.fillRect(cx + eyeOff - eyeSize, cy + e.h * 0.05, eyeSize * 2, eyeSize * 0.5);
+
+        // Walking animation (bouncing legs)
+        if (e.onPlatform && Math.abs(e.vx) > 1) {
+          ctx.fillStyle = e.color;
+          const legBob = Math.sin(e.animTimer * 5) * 3;
+          ctx.fillRect(cx - e.w * 0.25, e.y + e.h - 4 + legBob, e.w * 0.15, 6);
+          ctx.fillRect(cx + e.w * 0.1, e.y + e.h - 4 - legBob, e.w * 0.15, 6);
+        }
+      }
+    }
+
+    // Overlays drawn on top regardless of sprite/procedural
+    if (!e.dying) {
       // HP bar
       if (e.hp < e.maxHp) {
         const barW = e.w;
@@ -2946,12 +3023,10 @@ function drawEnemies() {
 
       // Freeze visual
       if (e.freezeTimer > 0) {
-        // Green snot overlay
         ctx.fillStyle = `rgba(100,200,40,${0.3 + 0.1 * Math.sin(performance.now() * 0.005)})`;
         ctx.beginPath();
         ctx.ellipse(cx, cy + e.h * 0.1, e.w / 2 + 2, e.h / 2 + 2, 0, 0, Math.PI * 2);
         ctx.fill();
-        // Dripping booger blobs
         const dripPhase = performance.now() * 0.003;
         ctx.fillStyle = '#88cc22';
         for (let b = 0; b < 3; b++) {
@@ -3072,23 +3147,27 @@ function drawMetalHat() {
   const x = hat.x;
   const y = hat.y;
 
-  // Glow
   ctx.save();
-  const glowAlpha = 0.3 + 0.15 * Math.sin(performance.now() * 0.005);
   ctx.shadowColor = '#88aaff';
   ctx.shadowBlur = 15;
 
-  // Hat brim
-  ctx.fillStyle = '#889';
-  ctx.fillRect(x - 3, y + HAT_SIZE - 5, HAT_SIZE + 6, 5);
-  // Hat dome
-  ctx.fillStyle = '#aab';
-  ctx.beginPath();
-  ctx.ellipse(x + HAT_SIZE / 2, y + HAT_SIZE - 6, HAT_SIZE * 0.4, HAT_SIZE * 0.6, 0, Math.PI, 0);
-  ctx.fill();
-  // Shine
-  ctx.fillStyle = `rgba(200,220,255,${glowAlpha})`;
-  ctx.fillRect(x + 4, y + 4, 4, 6);
+  if (metalHatSpriteLoaded) {
+    ctx.drawImage(metalHatSprite, x, y, HAT_SIZE, HAT_SIZE);
+  } else {
+    // Procedural fallback
+    const glowAlpha = 0.3 + 0.15 * Math.sin(performance.now() * 0.005);
+    // Hat brim
+    ctx.fillStyle = '#889';
+    ctx.fillRect(x - 3, y + HAT_SIZE - 5, HAT_SIZE + 6, 5);
+    // Hat dome
+    ctx.fillStyle = '#aab';
+    ctx.beginPath();
+    ctx.ellipse(x + HAT_SIZE / 2, y + HAT_SIZE - 6, HAT_SIZE * 0.4, HAT_SIZE * 0.6, 0, Math.PI, 0);
+    ctx.fill();
+    // Shine
+    ctx.fillStyle = `rgba(200,220,255,${glowAlpha})`;
+    ctx.fillRect(x + 4, y + 4, 4, 6);
+  }
 
   ctx.restore();
 }
@@ -3160,35 +3239,39 @@ function drawSmoothie() {
   const sz = SMOOTHIE_SIZE;
 
   ctx.save();
-  // Pulsing glow
-  const glowAlpha = 0.3 + 0.15 * Math.sin(performance.now() * 0.005);
   ctx.shadowColor = '#aa66ff';
   ctx.shadowBlur = 15;
 
-  // Cup body (blue-purple gradient look)
-  ctx.fillStyle = '#6633cc';
-  ctx.fillRect(x + 2, y + sz * 0.3, sz - 4, sz * 0.65);
-  // Cup top (lighter)
-  ctx.fillStyle = '#8855ee';
-  ctx.fillRect(x + 1, y + sz * 0.25, sz - 2, sz * 0.15);
-  // Smoothie surface (blueberry color)
-  ctx.fillStyle = '#5522aa';
-  ctx.fillRect(x + 3, y + sz * 0.3, sz - 6, sz * 0.1);
-  // Cup bottom (slightly narrower)
-  ctx.fillStyle = '#5528bb';
-  ctx.fillRect(x + 3, y + sz * 0.85, sz - 6, sz * 0.1);
+  if (smoothieSpriteLoaded) {
+    ctx.drawImage(smoothieSprite, x, y, sz, sz);
+  } else {
+    // Procedural fallback
+    const glowAlpha = 0.3 + 0.15 * Math.sin(performance.now() * 0.005);
+    // Cup body (blue-purple gradient look)
+    ctx.fillStyle = '#6633cc';
+    ctx.fillRect(x + 2, y + sz * 0.3, sz - 4, sz * 0.65);
+    // Cup top (lighter)
+    ctx.fillStyle = '#8855ee';
+    ctx.fillRect(x + 1, y + sz * 0.25, sz - 2, sz * 0.15);
+    // Smoothie surface (blueberry color)
+    ctx.fillStyle = '#5522aa';
+    ctx.fillRect(x + 3, y + sz * 0.3, sz - 6, sz * 0.1);
+    // Cup bottom (slightly narrower)
+    ctx.fillStyle = '#5528bb';
+    ctx.fillRect(x + 3, y + sz * 0.85, sz - 6, sz * 0.1);
 
-  // Straw
-  ctx.strokeStyle = '#ffccee';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x + sz * 0.6, y + sz * 0.3);
-  ctx.lineTo(x + sz * 0.7, y);
-  ctx.stroke();
+    // Straw
+    ctx.strokeStyle = '#ffccee';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + sz * 0.6, y + sz * 0.3);
+    ctx.lineTo(x + sz * 0.7, y);
+    ctx.stroke();
 
-  // Glow highlight
-  ctx.fillStyle = `rgba(180,140,255,${glowAlpha})`;
-  ctx.fillRect(x + 4, y + sz * 0.35, 3, 5);
+    // Glow highlight
+    ctx.fillStyle = `rgba(180,140,255,${glowAlpha})`;
+    ctx.fillRect(x + 4, y + sz * 0.35, 3, 5);
+  }
 
   ctx.restore();
 }
