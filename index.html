@@ -283,6 +283,14 @@ function playSound(type) {
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
       osc.start(t); osc.stop(t + 0.3);
       break;
+    case 'spiderWarn':
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(800, t);
+      osc.frequency.exponentialRampToValueAtTime(200, t + 0.4);
+      gain.gain.setValueAtTime(0.15, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
+      osc.start(t); osc.stop(t + 0.5);
+      break;
   }
 }
 
@@ -462,6 +470,7 @@ let chestplateSprite = null, chestplateSpriteLoaded = false;
 let swordSprite = null, swordSpriteLoaded = false;
 let quentinPizzaSprite = null, quentinPizzaSpriteLoaded = false;
 let snotCageSprite = null, snotCageSpriteLoaded = false;
+let spiderSprite = null, spiderSpriteLoaded = false;
 
 const spriteFiles = [
   ['data/grunt.png',           (s) => { gruntSprite = s; gruntSpriteLoaded = true; }],
@@ -474,6 +483,7 @@ const spriteFiles = [
   ['data/sword.png',           (s) => { swordSprite = s; swordSpriteLoaded = true; }],
   ['data/quentin_pizza.png',   (s) => { quentinPizzaSprite = s; quentinPizzaSpriteLoaded = true; }],
   ['data/snot_cage.png',       (s) => { snotCageSprite = s; snotCageSpriteLoaded = true; }],
+  ['data/spider.png',          (s) => { spiderSprite = s; spiderSpriteLoaded = true; }],
 ];
 for (const [src, cb] of spriteFiles) {
   const raw = new Image();
@@ -1126,6 +1136,7 @@ const CROWN_ANIM_DURATION = 3.0;
 let devMenuOpen = false;
 let devTapCount = 0;
 let devTapTimer = 0;
+let devSpawnPowerup = ''; // '', 'metal', 'muscle', 'wings'
 let devLeaderboard = localStorage.getItem('eggthonyDevLB') === 'true';
 
 // Name overlay elements & handlers
@@ -1669,6 +1680,55 @@ function drawBoss() {
 
   ctx.save();
 
+  // Frozen boss: replace with snot cage
+  if (boss.freezeTimer > 0 && !boss.dying && snotCageSpriteLoaded) {
+    const cageSpr = snotCageSprite;
+    const ratio = cageSpr.naturalWidth / cageSpr.naturalHeight;
+    const drawH = boss.h + 24;
+    const drawW = drawH * ratio;
+    const drawX = bcx - drawW / 2;
+    const feetY = boss.y + boss.h;
+    const drawY = feetY - drawH;
+
+    if (boss.flashTimer > 0) {
+      const fw = Math.ceil(drawW);
+      const fh = Math.ceil(drawH);
+      if (flashCanvas.width < fw) flashCanvas.width = fw;
+      if (flashCanvas.height < fh) flashCanvas.height = fh;
+      flashCtx.clearRect(0, 0, flashCanvas.width, flashCanvas.height);
+      flashCtx.globalCompositeOperation = 'source-over';
+      flashCtx.drawImage(cageSpr, 0, 0, fw, fh);
+      flashCtx.globalCompositeOperation = 'source-atop';
+      flashCtx.fillStyle = `rgba(255,255,255,${boss.flashTimer * 5})`;
+      flashCtx.fillRect(0, 0, fw, fh);
+      ctx.drawImage(flashCanvas, 0, 0, fw, fh, drawX, drawY, drawW, drawH);
+    } else {
+      ctx.drawImage(cageSpr, drawX, drawY, drawW, drawH);
+    }
+
+    // Stomp target arrow
+    const arrowBob = Math.sin(performance.now() * 0.008) * 5;
+    const arrowY = boss.y - 18 + arrowBob;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 18px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('\u25BC', bcx, arrowY);
+
+    ctx.restore();
+    ctx.globalAlpha = 1;
+
+    // Still draw shockwave ring if active
+    if (boss.shockwaveActive) {
+      const alpha = Math.max(0, boss.shockwaveTimer / 0.4);
+      ctx.strokeStyle = `rgba(255,120,40,${alpha})`;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(boss.shockwaveX, PLATFORM_Y, boss.shockwaveRadius, Math.PI, 0);
+      ctx.stroke();
+    }
+    return;
+  }
+
   // Aura (green for QP, red for evil eggthony)
   const auraSize = boss.rage ? 1.4 : 1.15;
   const auraAlpha = boss.rage ? (0.25 + 0.15 * Math.sin(performance.now() * 0.01)) : 0.1;
@@ -1745,31 +1805,7 @@ function drawBoss() {
     ctx.fillRect(bcx + eyeOff + eyeSize * 0.5, bcy - boss.h * 0.15, eyeSize, eyeSize);
   }
 
-  // Freeze visual on boss
-  if (boss.freezeTimer > 0) {
-    const pulse = 0.45 + 0.15 * Math.sin(performance.now() * 0.006);
-    ctx.fillStyle = `rgba(200,255,0,${pulse})`;
-    ctx.beginPath();
-    ctx.ellipse(bcx, bcy + boss.h * 0.1, boss.w / 2 + 6, boss.h / 2 + 6, 0, 0, Math.PI * 2);
-    ctx.fill();
-    const dripPhase = performance.now() * 0.003;
-    ctx.fillStyle = '#bbee22';
-    for (let b = 0; b < 6; b++) {
-      const bx = bcx + (b - 2.5) * boss.w * 0.18;
-      const dripY = Math.sin(dripPhase + b * 1.3) * 5;
-      const by = bcy + boss.h * 0.3 + dripY;
-      ctx.beginPath();
-      ctx.ellipse(bx, by, 5, 6 + dripY * 0.5, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    // Stomp target arrow
-    const arrowBob = Math.sin(performance.now() * 0.008) * 5;
-    const arrowY = boss.y - 18 + arrowBob;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 18px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('\u25BC', bcx, arrowY);
-  }
+  // (Freeze visual now handled by snot cage early return above)
 
   // Shockwave ring
   if (boss.shockwaveActive) {
@@ -2561,6 +2597,7 @@ const player = {
   airJumps: 1,
   jumpHeld: false,
   wingsTimer: 0,
+  spiderDropTimer: 0,
   poopCooldown: 0,
   stompChain: 0,
   snotStormTimer: 0
@@ -2585,6 +2622,7 @@ function resetPlayer() {
   player.airJumps = 1;
   player.jumpHeld = false;
   player.wingsTimer = 0;
+  player.spiderDropTimer = 0;
   player.poopCooldown = 0;
   player.stompChain = 0;
   player.snotStormTimer = 0;
@@ -2599,7 +2637,18 @@ function updatePlayer(dt) {
   if (keys['d'] || keys['arrowright']) moveX += 1;
   player.vx = moveX * PLAYER_SPEED;
 
-  if (player.wingsTimer > 0) {
+  if (player.spiderDropTimer > 0) {
+    // Spider Drop mode — hang from ceiling, 3x fire rate
+    player.spiderDropTimer -= dt;
+    player.y = SPIDER_DROP_Y + Math.sin(performance.now() * 0.004) * 3;
+    player.vy = 0;
+    player.onGround = false;
+    player.x += player.vx * dt;
+    // End: drop back down
+    if (player.spiderDropTimer <= 0) {
+      player.spiderDropTimer = 0;
+    }
+  } else if (player.wingsTimer > 0) {
     // Flying mode — rise to target height, gentle bob
     const targetY = WINGS_FLY_Y;
     if (player.y + PLAYER_H / 2 > targetY) {
@@ -2763,9 +2812,42 @@ function updatePlayer(dt) {
     }
   } else {
     // Lightning attack (left click only — right click is snot rocket)
-    if (mouse.left && player.lightningCooldown <= 0) {
+    if (campSpider && campSpider.state === 'grabbed') {
+      // Mash zap to escape — must release and re-click each time
+      if (!mouse.left) spiderZapReady = true;
+      if (mouse.left && spiderZapReady) {
+        spiderZapReady = false;
+        campSpider.zapHits++;
+        spawnParticles(campSpider.x, campSpider.y, '#ffff44', 5, 100, 0.3);
+        playSound('hit');
+        addShake(3, 0.08);
+        if (campSpider.zapHits >= CAMP_SPIDER_ZAPS_TO_ESCAPE) {
+          const isClutch = player.y < SPIDER_DROP_CLUTCH_Y;
+          campSpider.state = 'retreating';
+          player.iframes = 1.0;
+          player.hp -= CAMP_SPIDER_ESCAPE_DMG;
+          spawnParticles(campSpider.x, campSpider.y, '#88ff44', 15, 200, 0.5);
+          spawnDamageNumber(player.x + PLAYER_W / 2, player.y, CAMP_SPIDER_ESCAPE_DMG, '#ff4444');
+          addShake(8, 0.2);
+          playSound('hurt');
+          campTimer = 0;
+          if (isClutch) {
+            // Clutch escape — activate Spider Drop!
+            player.spiderDropTimer = SPIDER_DROP_DURATION;
+            player.y = SPIDER_DROP_Y;
+            player.vy = 0;
+            player.onGround = false;
+            spawnParticles(player.x + PLAYER_W / 2, player.y, '#ff44ff', 20, 250, 0.6);
+            addShake(10, 0.25);
+            playSound('powerup');
+          } else {
+            player.vy = -300;
+          }
+        }
+      }
+    } else if (mouse.left && player.lightningCooldown <= 0) {
       autoAimMouse();
-      player.lightningCooldown = LIGHTNING_COOLDOWN;
+      player.lightningCooldown = player.spiderDropTimer > 0 ? LIGHTNING_COOLDOWN / 3 : LIGHTNING_COOLDOWN;
       fireLightning();
     }
   }
@@ -2776,7 +2858,7 @@ function drawPlayer() {
   const py = player.y;
 
   // Iframes flicker (not during metal, muscle, or wings mode)
-  if (player.metalTimer <= 0 && player.muscleTimer <= 0 && player.wingsTimer <= 0 && player.iframes > 0 && Math.floor(player.iframes * 15) % 2 === 0) return;
+  if (player.metalTimer <= 0 && player.muscleTimer <= 0 && player.wingsTimer <= 0 && player.spiderDropTimer <= 0 && player.iframes > 0 && Math.floor(player.iframes * 15) % 2 === 0) return;
   const isMetal = player.metalTimer > 0;
   const isMuscle = player.muscleTimer > 0;
   const isFlying = player.wingsTimer > 0;
@@ -2833,6 +2915,30 @@ function drawPlayer() {
         life: 0.6, maxLife: 0.6,
         color: Math.random() < 0.5 ? '#ffdd88' : '#fff8e0', size: 2
       });
+    }
+  }
+
+  // Spider Drop mode — web thread + purple aura
+  if (player.spiderDropTimer > 0) {
+    // Web thread from ceiling
+    ctx.strokeStyle = 'rgba(200,200,200,0.7)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, 0);
+    ctx.lineTo(cx, py);
+    ctx.stroke();
+    // Purple spider aura
+    const auraPhase = performance.now() * 0.007;
+    const auraRadius = 50 + Math.sin(auraPhase) * 5;
+    const auraAlpha = 0.2 + 0.1 * Math.sin(auraPhase * 2);
+    ctx.strokeStyle = `rgba(180,60,255,${auraAlpha})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, auraRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    // Blink warning when about to expire
+    if (player.spiderDropTimer < 1.5 && Math.floor(player.spiderDropTimer * 6) % 2 === 0) {
+      ctx.globalAlpha = 0.5;
     }
   }
 
@@ -3267,10 +3373,10 @@ function snotAOEFreeze(cx, cy) {
       e.freezeTimer = SNOT_FREEZE_DURATION;
     }
   }
-  // Freeze boss (shorter duration)
+  // Freeze boss (shorter duration, use closest point on boss hitbox)
   if (boss && bossActive && !boss.dying && boss.state !== 'entering') {
-    const bcx = boss.x + boss.w / 2;
-    const bcy = boss.y + boss.h / 2;
+    const bcx = Math.max(boss.x, Math.min(cx, boss.x + boss.w));
+    const bcy = Math.max(boss.y, Math.min(cy, boss.y + boss.h));
     const dist = Math.hypot(cx - bcx, cy - bcy);
     if (dist < SNOT_AOE_RADIUS) {
       boss.freezeTimer = SNOT_FREEZE_DURATION * 0.5;
@@ -4424,10 +4530,10 @@ function poopAOEDamage(cx, cy) {
     }
   }
 
-  // Damage boss in radius
+  // Damage boss in radius (use closest point on boss hitbox)
   if (boss && !boss.dying && boss.state !== 'entering') {
-    const bx = boss.x + boss.w / 2;
-    const by = boss.y + boss.h / 2;
+    const bx = Math.max(boss.x, Math.min(cx, boss.x + boss.w));
+    const by = Math.max(boss.y, Math.min(cy, boss.y + boss.h));
     const dist = Math.hypot(bx - cx, by - cy);
     if (dist < POOP_AOE_RADIUS) {
       const knockDir = Math.sign(bx - cx) || 1;
@@ -4898,6 +5004,154 @@ function drawDwyer() {
 }
 
 // ============================================================
+// CAMP SPIDER — descends from ceiling if player stays still
+// ============================================================
+const CAMP_SPIDER_DELAY = 4.0;     // seconds before spider appears
+const CAMP_SPIDER_DESCEND = 1.5;   // seconds to reach player
+const CAMP_SPIDER_GRAB_TIME = 2.0; // seconds to pull player off screen
+const CAMP_SPIDER_ZAPS_TO_ESCAPE = 5;
+const CAMP_SPIDER_ESCAPE_DMG = 30;
+const CAMP_RADIUS = 60;
+const SPIDER_DROP_DURATION = 4.0;
+const SPIDER_DROP_CLUTCH_Y = 150; // must be above this Y to trigger clutch reward
+const SPIDER_DROP_Y = 60;         // hang position from ceiling
+
+let campTimer = 0;
+let campX = W / 2;
+let campSpider = null; // { state, x, y, targetY, grabTimer, zapHits }
+let spiderZapReady = false; // requires click release between each escape zap
+
+function updateCampSpider(dt) {
+  const pcx = player.x + PLAYER_W / 2;
+  const onFloatPlat = player.onGround && (player.y + PLAYER_H) < PLATFORM_Y - 10;
+
+  // Track camping (only on main platform)
+  if (onFloatPlat || !player.onGround || Math.abs(pcx - campX) > CAMP_RADIUS) {
+    campTimer = 0;
+    campX = pcx;
+    // Retract spider if player moves
+    if (campSpider && campSpider.state !== 'grabbed') {
+      campSpider.state = 'retreating';
+    }
+  } else {
+    campTimer += dt;
+  }
+
+  // Spawn spider after camping long enough
+  if (!campSpider && campTimer >= CAMP_SPIDER_DELAY) {
+    campSpider = {
+      state: 'descending',
+      x: pcx,
+      y: -40,
+      targetY: player.y - 10,
+      grabTimer: 0,
+      zapHits: 0
+    };
+    playSound('spiderWarn');
+  }
+
+  if (!campSpider) return;
+  const sp = campSpider;
+
+  switch (sp.state) {
+    case 'descending':
+      sp.x = pcx; // track player X
+      sp.targetY = player.y - 10;
+      sp.y += (sp.targetY - sp.y) / CAMP_SPIDER_DESCEND * dt * 2;
+      if (Math.abs(sp.y - sp.targetY) < 8) {
+        sp.state = 'grabbed';
+        sp.grabTimer = 0;
+        sp.zapHits = 0;
+      }
+      break;
+
+    case 'grabbed':
+      sp.grabTimer += dt;
+      // Pull player upward with struggle wiggle
+      const wiggle = Math.sin(performance.now() * 0.015) * 8;
+      player.x = sp.x - PLAYER_W / 2 + wiggle;
+      player.y -= 120 * dt;
+      sp.y = player.y - 10;
+      player.vy = 0;
+      player.onGround = false;
+
+      // Pulled off screen — death
+      if (player.y < -PLAYER_H - 20) {
+        player.hp = 0;
+        campSpider = null;
+        return;
+      }
+      break;
+
+    case 'retreating':
+      sp.y -= 400 * dt;
+      if (sp.y < -60) {
+        campSpider = null;
+      }
+      break;
+  }
+}
+
+function drawCampSpider() {
+  if (!campSpider) return;
+  const sp = campSpider;
+
+  ctx.save();
+  // Web thread from ceiling to spider
+  ctx.strokeStyle = 'rgba(200,200,200,0.6)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(sp.x, 0);
+  ctx.lineTo(sp.x, sp.y);
+  ctx.stroke();
+
+  // Spider sprite
+  const bob = Math.sin(performance.now() * 0.008) * 3;
+  const spW = 80;
+  const spH = spiderSpriteLoaded ? spW * (spiderSprite.naturalHeight / spiderSprite.naturalWidth) : 44;
+
+  if (spiderSpriteLoaded) {
+    ctx.drawImage(spiderSprite, sp.x - spW / 2, sp.y + bob - spH / 2, spW, spH);
+  } else {
+    // Fallback circle
+    ctx.fillStyle = '#1a1a1a';
+    ctx.beginPath();
+    ctx.arc(sp.x, sp.y + bob, 20, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#ff0000';
+    ctx.beginPath();
+    ctx.arc(sp.x - 5, sp.y + bob - 5, 3, 0, Math.PI * 2);
+    ctx.arc(sp.x + 5, sp.y + bob - 5, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Grab state: show escape progress
+  if (sp.state === 'grabbed') {
+    const progress = sp.zapHits / CAMP_SPIDER_ZAPS_TO_ESCAPE;
+    const barW = 50;
+    const barH = 6;
+    const barX = sp.x - barW / 2;
+    const barY = sp.y + bob - spH / 2 - 16;
+    ctx.fillStyle = '#440000';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#ffcc00';
+    ctx.fillRect(barX, barY, barW * progress, barH);
+    ctx.strokeStyle = '#888';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, barH);
+
+    // "MASH ZAP!" text
+    const flashAlpha = 0.5 + 0.5 * Math.sin(performance.now() * 0.01);
+    ctx.fillStyle = `rgba(255,255,100,${flashAlpha})`;
+    ctx.font = 'bold 12px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('MASH ZAP!', sp.x, barY - 6);
+  }
+
+  ctx.restore();
+}
+
+// ============================================================
 // WAVE SYSTEM
 // ============================================================
 let waveEnemiesRemaining = 0;
@@ -4929,6 +5183,8 @@ function startRound(r) {
   occupiedSlots = new Set();
   floatPlatSpawnTimer = 3.0;
   fartClouds = [];
+  campSpider = null;
+  campTimer = 0;
   playSound('roundStart');
 }
 
@@ -4959,7 +5215,7 @@ function updateWaves(dt) {
 
   // Check round completion: all spawned and all dead/off-screen
   const aliveEnemies = enemies.filter(e => !e.dying).length;
-  if (waveEnemiesSpawned >= waveEnemiesTotal && aliveEnemies === 0) {
+  if (waveEnemiesSpawned >= waveEnemiesTotal && aliveEnemies === 0 && !campSpider) {
     // Clear any remaining enemy projectiles
     enemyProjectiles = [];
     gameState = 'roundTransition';
@@ -5374,8 +5630,33 @@ function drawTitleScreen() {
     ctx.font = 'bold 14px monospace';
     ctx.fillText('CLOSE', W / 2, startY + rows * (btnH + gap) + 43);
 
+    // Dev powerup toggles
+    const pwY = startY + rows * (btnH + gap) + 72;
+    ctx.fillStyle = '#888';
+    ctx.font = '11px monospace';
+    ctx.fillText('START WITH POWERUP:', W / 2, pwY);
+    const pwNames = ['NONE', 'METAL', 'MUSCLE', 'WINGS'];
+    const pwKeys = ['', 'metal', 'muscle', 'wings'];
+    const pwColors = ['#666', '#aaccff', '#cc66ff', '#ffdd88'];
+    const pwBtnW = 60, pwGap = 6;
+    const pwTotalW = pwNames.length * pwBtnW + (pwNames.length - 1) * pwGap;
+    const pwStartX = (W - pwTotalW) / 2;
+    for (let i = 0; i < pwNames.length; i++) {
+      const bx = pwStartX + i * (pwBtnW + pwGap);
+      const by = pwY + 8;
+      const active = devSpawnPowerup === pwKeys[i];
+      ctx.fillStyle = active ? '#224433' : '#333';
+      ctx.fillRect(bx, by, pwBtnW, 26);
+      ctx.strokeStyle = active ? pwColors[i] : '#555';
+      ctx.lineWidth = active ? 2 : 1;
+      ctx.strokeRect(bx, by, pwBtnW, 26);
+      ctx.fillStyle = active ? pwColors[i] : '#aaa';
+      ctx.font = 'bold 10px monospace';
+      ctx.fillText(pwNames[i], bx + pwBtnW / 2, by + 17);
+    }
+
     // Dev leaderboard controls
-    const dlY = startY + rows * (btnH + gap) + 76;
+    const dlY = startY + rows * (btnH + gap) + 116;
     const dlX = W / 2 - 130;
     // Toggle button
     ctx.fillStyle = devLeaderboard ? '#224422' : '#333';
@@ -5660,6 +5941,8 @@ function handleDevMenuClick(cx, cy) {
         chestplateItem = null;
         chestplateSpawnTimer = 30 + Math.random() * 15;
         dwyer = null;
+        campSpider = null;
+        campTimer = 0;
         boss = null;
         bossActive = false;
         bossEntering = false;
@@ -5677,6 +5960,9 @@ function handleDevMenuClick(cx, cy) {
         initAmbientParticles();
         initBgDetails();
         resetPlayer();
+        if (devSpawnPowerup === 'metal') player.metalTimer = METAL_DURATION;
+        if (devSpawnPowerup === 'muscle') player.muscleTimer = MUSCLE_DURATION;
+        if (devSpawnPowerup === 'wings') player.wingsTimer = WINGS_DURATION;
         startRound(r);
         return true;
       }
@@ -5688,8 +5974,22 @@ function handleDevMenuClick(cx, cy) {
     devMenuOpen = false;
     return true;
   }
+  // Dev powerup toggles
+  const pwY = startY + rows * (btnH + gap) + 72;
+  const pwNames = ['', 'metal', 'muscle', 'wings'];
+  const pwBtnW = 60, pwGap = 6;
+  const pwTotalW = 4 * pwBtnW + 3 * pwGap;
+  const pwStartX = (W - pwTotalW) / 2;
+  for (let i = 0; i < 4; i++) {
+    const bx = pwStartX + i * (pwBtnW + pwGap);
+    const by = pwY + 8;
+    if (cx >= bx && cx <= bx + pwBtnW && cy >= by && cy <= by + 26) {
+      devSpawnPowerup = pwNames[i];
+      return true;
+    }
+  }
   // Dev leaderboard controls
-  const dlY = startY + rows * (btnH + gap) + 76;
+  const dlY = startY + rows * (btnH + gap) + 116;
   const dlX = W / 2 - 130;
   // Toggle
   if (cx >= dlX && cx <= dlX + 260 && cy >= dlY && cy <= dlY + 36) {
@@ -5786,6 +6086,8 @@ canvas.addEventListener('click', (e) => {
     chestplateItem = null;
     chestplateSpawnTimer = 30 + Math.random() * 15;
     dwyer = null;
+    campSpider = null;
+    campTimer = 0;
     boss = null;
     bossActive = false;
     bossEntering = false;
@@ -5829,6 +6131,8 @@ canvas.addEventListener('click', (e) => {
     chestplateItem = null;
     chestplateSpawnTimer = 30 + Math.random() * 15;
     dwyer = null;
+    campSpider = null;
+    campTimer = 0;
     boss = null;
     bossActive = false;
     bossEntering = false;
@@ -5950,6 +6254,7 @@ function update(dt) {
     updatePoopBombs(dt);
     updateChestplate(dt);
     updateDwyer(dt);
+    updateCampSpider(dt);
     updateWaves(dt);
     updateFloatingPlatforms(dt);
 
@@ -5959,6 +6264,8 @@ function update(dt) {
       gameOverCooldown = 1.5;
       musicClip.pause();
       dwyer = null;
+      campSpider = null;
+      campTimer = 0;
       spawnParticles(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, '#f5e6c8', 30, 300, 1.0);
       addShake(12, 0.4);
       playSound('gameOver');
@@ -6017,6 +6324,7 @@ function draw() {
     drawLightning();
     drawSnotRocket();
     drawPoopBombs();
+    drawCampSpider();
     drawParticles();
     drawDamageNumbers();
     drawHUD();
