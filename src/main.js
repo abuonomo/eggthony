@@ -4,7 +4,7 @@
 import { S, resetPlayer, resetGameState } from './state.js';
 import {
   W, H, TICK_RATE, PLAYER_W, PLAYER_H, PLAYER_MAX_HP,
-  THEMES, CROWN_ANIM_DURATION,
+  PLATFORM_Y, THEMES, CROWN_ANIM_DURATION,
 } from './constants.js';
 import { ensureAudio, playSound, playNoise, playVoice, musicClip } from './audio.js';
 import { spawnParticles, updateParticles, drawParticles,
@@ -32,6 +32,9 @@ import { startRound, updateWaves } from './waves.js';
 import { drawHUD, drawTitleScreen, drawRoundTransition, drawGameOver,
          handleDevMenuClick, fetchLeaderboard, showNameInput, hideNameInput,
          initNameOverlay } from './screens.js';
+import { loadGear, loadGearSprites, rollDrop, awardDrop, setPlayerSprite,
+         drawEquipScreen, handleEquipScreenClick, drawGearDrop, GEAR_ITEMS } from './gear.js';
+import { eggSprite, spriteLoaded } from './sprites.js';
 
 // ============================================================
 // CANVAS SETUP
@@ -79,17 +82,38 @@ fetchLeaderboard();
 initAmbientParticles();
 initBgDetails();
 
+// Gear system init
+loadGearSprites();
+loadGear();
+setPlayerSprite(eggSprite, spriteLoaded);
+// Update sprite ref once loaded
+eggSprite.addEventListener('load', () => setPlayerSprite(eggSprite, true));
+
 // ============================================================
 // CLICK HANDLER (state transitions)
 // ============================================================
 canvas.addEventListener('click', (e) => {
   ensureAudio();
+  const rect = canvas.getBoundingClientRect();
+  const cx = (e.clientX - rect.left) * (W / rect.width);
+  const cy = (e.clientY - rect.top) * (H / rect.height);
+
+  if (S.gameState === 'equipScreen') {
+    handleEquipScreenClick(cx, cy);
+    return;
+  }
+
+  if (S.gameState === 'gearDrop') {
+    if (S.gearDropTimer > 1.0) {
+      S.gearReturnState = 'gameOver';
+      S.gearSelectedSlot = GEAR_ITEMS[S.gearDropItem]?.slot || 'head';
+      S.gameState = 'equipScreen';
+      S.gameOverCooldown = 1.5;
+    }
+    return;
+  }
 
   if (S.gameState === 'title') {
-    const rect = canvas.getBoundingClientRect();
-    const cx = (e.clientX - rect.left) * (W / rect.width);
-    const cy = (e.clientY - rect.top) * (H / rect.height);
-
     if (S.devMenuOpen) {
       handleDevMenuClick(cx, cy);
       return;
@@ -106,6 +130,17 @@ canvas.addEventListener('click', (e) => {
       return;
     }
 
+    // GEAR button on title (bottom-right) — only if player has gear
+    if (S.gear.inventory.length > 0) {
+      const gearBtnX = W - 110, gearBtnY = PLATFORM_Y - 90, gearBtnW = 100, gearBtnH = 36;
+      if (cx >= gearBtnX && cx <= gearBtnX + gearBtnW && cy >= gearBtnY && cy <= gearBtnY + gearBtnH) {
+        S.gearReturnState = 'title';
+        S.gearSelectedSlot = 'head';
+        S.gameState = 'equipScreen';
+        return;
+      }
+    }
+
     // Normal start
     S.gameState = 'playing';
     playVoice('start', true);
@@ -117,6 +152,17 @@ canvas.addEventListener('click', (e) => {
     initBgDetails();
     startRound(1);
   } else if (S.gameState === 'gameOver' && S.gameOverPhase === 'showing') {
+    // GEAR button on game over (bottom-left area) — only if player has gear
+    if (S.gear.inventory.length > 0) {
+      const goGearX = 14, goGearY = H - 60, goGearW = 80, goGearH = 36;
+      if (cx >= goGearX && cx <= goGearX + goGearW && cy >= goGearY && cy <= goGearY + goGearH) {
+        S.gearReturnState = 'gameOver';
+        S.gearSelectedSlot = 'head';
+        S.gameState = 'equipScreen';
+        return;
+      }
+    }
+
     hideNameInput();
     S.crownAnimActive = false;
     S.crownAnimTimer = 0;
@@ -212,6 +258,13 @@ function update(dt) {
   }
 
   if (S.gameState === 'paused') return;
+  if (S.gameState === 'equipScreen') return;
+
+  // Gear drop animation timer
+  if (S.gameState === 'gearDrop') {
+    S.gearDropTimer += dt;
+    return;
+  }
 
   if (S.gameState === 'playing') {
     updatePlayer(dt);
@@ -232,8 +285,6 @@ function update(dt) {
 
     // Check death
     if (S.player.hp <= 0) {
-      S.gameState = 'gameOver';
-      S.gameOverCooldown = 1.5;
       musicClip.pause();
       S.dwyer = null;
       S.campSpider = null;
@@ -243,10 +294,23 @@ function update(dt) {
       playSound('gameOver');
       playNoise(0.3, 0.2);
       playVoice('lose', true);
+
+      // Roll for gear drop
+      const drop = rollDrop(S.round);
+      if (drop) {
+        awardDrop(drop);
+        S.gearDropItem = drop;
+        S.gearDropTimer = 0;
+        S.gameState = 'gearDrop';
+      } else {
+        S.gameState = 'gameOver';
+        S.gameOverCooldown = 1.5;
+      }
     }
 
     // "Bad" voice when HP drops below 25%
-    if (!S.lowHpTriggered && S.player.hp > 0 && S.player.hp <= PLAYER_MAX_HP * 0.25) {
+    const lowHpMax = PLAYER_MAX_HP + (S.gear.totalBuffs ? S.gear.totalBuffs.maxHp : 0);
+    if (!S.lowHpTriggered && S.player.hp > 0 && S.player.hp <= lowHpMax * 0.25) {
       S.lowHpTriggered = true;
       playVoice('bad', true);
     }
@@ -262,7 +326,8 @@ function update(dt) {
         S.themeFadeAlpha = 0;
       }
       const healAmount = isBossRound(S.round) ? 50 : 20;
-      S.player.hp = Math.min(PLAYER_MAX_HP, S.player.hp + healAmount);
+      const gearMaxHp = S.gear.totalBuffs ? S.gear.totalBuffs.maxHp : 0;
+      S.player.hp = Math.min(PLAYER_MAX_HP + gearMaxHp, S.player.hp + healAmount);
       startRound(S.round);
       S.gameState = 'playing';
     }
@@ -270,6 +335,10 @@ function update(dt) {
 }
 
 function draw() {
+  // Show cursor on menu screens, hide during gameplay
+  const menuState = S.gameState === 'title' || S.gameState === 'equipScreen' || S.gameState === 'gameOver' || S.gameState === 'gearDrop';
+  canvas.style.cursor = menuState ? 'default' : 'none';
+
   ctx.save();
   ctx.translate(S.shakeX, S.shakeY);
 
@@ -277,6 +346,12 @@ function draw() {
   drawBackground();
   drawPlatform();
   drawFloatingPlatforms();
+
+  if (S.gameState === 'equipScreen') {
+    drawEquipScreen();
+    ctx.restore();
+    return;
+  }
 
   if (S.gameState === 'title') {
     drawTitleScreen();
@@ -314,6 +389,8 @@ function draw() {
       ctx.fillText('Press ESC to resume', W / 2, H / 2 + 30);
     } else if (S.gameState === 'roundTransition') {
       drawRoundTransition();
+    } else if (S.gameState === 'gearDrop') {
+      drawGearDrop();
     } else if (S.gameState === 'gameOver') {
       drawGameOver();
     }

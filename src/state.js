@@ -121,6 +121,13 @@ export const S = {
   chestplateSpawnTimer: 30 + Math.random() * 15,
   dwyer: null,
 
+  // Gear system
+  gear: { version: 1, inventory: [], equipped: { head: null, body: null, collar: null, accessory: null }, totalBuffs: { maxHp: 0, speed: 0, jumpForce: 0, damage: 0, scoreMult: 1.0 } },
+  gearSelectedSlot: 'head',
+  gearReturnState: 'title',
+  gearDropItem: null,
+  gearDropTimer: 0,
+
   // Camp spider
   campTimer: 0,
   campX: W / 2,
@@ -149,7 +156,7 @@ export function resetPlayer() {
   player.vx = 0;
   player.vy = 0;
   player.onGround = false;
-  player.hp = PLAYER_MAX_HP;
+  player.hp = PLAYER_MAX_HP + (S.gear.totalBuffs ? S.gear.totalBuffs.maxHp : 0);
   player.iframes = 0;
   player.lightningCooldown = 0;
   player.flashTimer = 0;

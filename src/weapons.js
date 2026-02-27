@@ -75,7 +75,8 @@ export function updateLightningBolts(dt) {
       const ecy = e.y + e.h / 2;
       const dist = Math.hypot(b.x - ecx, b.y - ecy);
       if (dist < e.w / 2 + 10) {
-        damageEnemy(j, LIGHTNING_DAMAGE, b.vx * 0.3, -100);
+        const gearDmg = S.gear.totalBuffs ? S.gear.totalBuffs.damage : 0;
+        damageEnemy(j, LIGHTNING_DAMAGE + gearDmg, b.vx * 0.3, -100);
         const hitColor = player.snotStormTimer > 0 ? '#88ff44' : '#77ccff';
         spawnParticles(b.x, b.y, hitColor, 5, 100, 0.3);
         // Snot Storm AOE splash
@@ -117,7 +118,8 @@ export function updateLightningBolts(dt) {
       const bcy = boss.y + boss.h / 2;
       const dist = Math.hypot(b.x - bcx, b.y - bcy);
       if (dist < boss.w / 2 + 10) {
-        damageBoss(LIGHTNING_DAMAGE, b.vx * 0.3, -100);
+        const gearDmgB = S.gear.totalBuffs ? S.gear.totalBuffs.damage : 0;
+        damageBoss(LIGHTNING_DAMAGE + gearDmgB, b.vx * 0.3, -100);
         const hitColor = player.snotStormTimer > 0 ? '#88ff44' : '#77ccff';
         spawnParticles(b.x, b.y, hitColor, 5, 100, 0.3);
         if (player.snotStormTimer > 0) {
@@ -553,7 +555,8 @@ function poopAOEDamage(cx, cy) {
       if (e.hp <= 0 && !e.dying) {
         e.dying = true;
         e.deathTimer = 0.4;
-        S.score += e.type === 'brute' ? 30 : e.type === 'spitter' ? 20 : 10;
+        const stormScore = e.type === 'brute' ? 30 : e.type === 'spitter' ? 20 : 10;
+        S.score += Math.round(stormScore * (S.gear.totalBuffs ? S.gear.totalBuffs.scoreMult : 1));
       }
     }
   }

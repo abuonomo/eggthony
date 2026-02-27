@@ -1,0 +1,262 @@
+{
+  "propeller_hat": {
+    "id": "propeller_hat",
+    "name": "Propeller Hat",
+    "slot": "head",
+    "rarity": "common",
+    "dropWeight": 40,
+    "minRound": 1,
+    "buffs": {
+      "maxHp": 5
+    },
+    "sprite": "data/gear/propeller_hat.png",
+    "anchors": {
+      "default": {
+        "x": 5,
+        "y": 12,
+        "flipH": true
+      },
+      "metal": {
+        "x": 6,
+        "y": 9,
+        "flipH": true
+      },
+      "muscle": {
+        "x": 4,
+        "y": 6,
+        "flipH": true
+      },
+      "wings": {
+        "x": 3,
+        "y": 12,
+        "flipH": true
+      }
+    },
+    "drawW": 45,
+    "drawH": 49
+  },
+  "welding_goggles": {
+    "id": "welding_goggles",
+    "name": "Welding Goggles",
+    "slot": "body",
+    "rarity": "common",
+    "dropWeight": 40,
+    "minRound": 1,
+    "buffs": {
+      "maxHp": 8
+    },
+    "sprite": "data/gear/welding_goggles.png",
+    "anchors": {
+      "default": {
+        "x": 7,
+        "y": 40
+      },
+      "metal": {
+        "x": 8,
+        "y": 37
+      },
+      "muscle": {
+        "x": 5,
+        "y": 22
+      },
+      "wings": {
+        "x": 4,
+        "y": 34
+      }
+    },
+    "drawW": 42,
+    "drawH": 32
+  },
+  "bowtie": {
+    "id": "bowtie",
+    "name": "Bowtie",
+    "slot": "collar",
+    "rarity": "common",
+    "dropWeight": 40,
+    "minRound": 1,
+    "buffs": {
+      "speed": 10
+    },
+    "sprite": "data/gear/bowtie.png",
+    "anchors": {
+      "default": {
+        "x": 4,
+        "y": 70
+      },
+      "metal": {
+        "x": 5,
+        "y": 66
+      },
+      "muscle": {
+        "x": 5,
+        "y": 37
+      },
+      "wings": {
+        "x": 3,
+        "y": 61
+      }
+    },
+    "drawW": 37,
+    "drawH": 36
+  },
+  "star_pin": {
+    "id": "star_pin",
+    "name": "Star Pin",
+    "slot": "accessory",
+    "rarity": "common",
+    "dropWeight": 40,
+    "minRound": 1,
+    "buffs": {
+      "dropLuck": 0.1
+    },
+    "sprite": "data/gear/star_pin.png",
+    "anchors": {
+      "default": {
+        "x": -21,
+        "y": 44
+      },
+      "metal": {
+        "x": -16,
+        "y": 28
+      },
+      "muscle": {
+        "x": -13,
+        "y": 25
+      },
+      "wings": {
+        "x": -15,
+        "y": 26
+      }
+    },
+    "drawW": 19,
+    "drawH": 24
+  },
+  "traffic_cone": {
+    "id": "traffic_cone",
+    "name": "Traffic Cone",
+    "slot": "head",
+    "rarity": "uncommon",
+    "dropWeight": 30,
+    "minRound": 3,
+    "buffs": {
+      "maxHp": 15
+    },
+    "sprite": "data/gear/traffic_cone.png",
+    "anchors": {
+      "default": {
+        "x": 5,
+        "y": -4
+      },
+      "metal": {
+        "x": 3,
+        "y": -6
+      },
+      "muscle": {
+        "x": 4,
+        "y": -3
+      },
+      "wings": {
+        "x": 2,
+        "y": 3
+      }
+    },
+    "drawW": 39,
+    "drawH": 35
+  },
+  "blue_light_blockers": {
+    "id": "blue_light_blockers",
+    "name": "Blue Blockers",
+    "slot": "body",
+    "rarity": "uncommon",
+    "dropWeight": 30,
+    "minRound": 3,
+    "buffs": {
+      "damage": 5
+    },
+    "sprite": "data/gear/blue_light_blockers.png",
+    "anchors": {
+      "default": {
+        "x": 7,
+        "y": 32
+      },
+      "metal": {
+        "x": 6,
+        "y": 32
+      },
+      "muscle": {
+        "x": 5,
+        "y": 19
+      },
+      "wings": {
+        "x": 4,
+        "y": 29
+      }
+    },
+    "drawW": 33,
+    "drawH": 17
+  },
+  "shark_tooth_necklace": {
+    "id": "shark_tooth_necklace",
+    "name": "Shark Tooth",
+    "slot": "collar",
+    "rarity": "uncommon",
+    "dropWeight": 30,
+    "minRound": 3,
+    "buffs": {
+      "speed": 20
+    },
+    "sprite": "data/gear/shark_tooth_necklace.png",
+    "anchors": {
+      "default": {
+        "x": 2,
+        "y": 73
+      },
+      "metal": {
+        "x": 2,
+        "y": 71
+      },
+      "muscle": {
+        "x": 2,
+        "y": 40
+      },
+      "wings": {
+        "x": 1,
+        "y": 61
+      }
+    },
+    "drawW": 39,
+    "drawH": 20
+  },
+  "eye_drops": {
+    "id": "eye_drops",
+    "name": "Eye Drops",
+    "slot": "accessory",
+    "rarity": "uncommon",
+    "dropWeight": 30,
+    "minRound": 3,
+    "buffs": {
+      "damage": 4
+    },
+    "sprite": "data/gear/eye_drops.png",
+    "anchors": {
+      "default": {
+        "x": -20,
+        "y": 42
+      },
+      "metal": {
+        "x": -20,
+        "y": 39
+      },
+      "muscle": {
+        "x": -11,
+        "y": 25
+      },
+      "wings": {
+        "x": -16,
+        "y": 37
+      }
+    },
+    "drawW": 17,
+    "drawH": 15
+  }
+}

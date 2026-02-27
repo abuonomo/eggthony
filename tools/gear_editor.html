@@ -1,0 +1,669 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gear Anchor Editor</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #0e0e1a; color: #ddd; font-family: 'Courier New', monospace; overflow: hidden; }
+  .layout { display: flex; height: 100vh; }
+
+  /* Left panel */
+  .panel { width: 280px; background: #12122a; border-right: 2px solid #2a2a4a; padding: 10px; overflow-y: auto; flex-shrink: 0; }
+  .panel h1 { font-size: 15px; color: #ffcc00; margin-bottom: 6px; }
+  .panel h2 { font-size: 12px; color: #4488ff; margin: 10px 0 4px; text-transform: uppercase; letter-spacing: 1px; }
+  .hint { font-size: 10px; color: #555; margin-bottom: 8px; }
+
+  /* Variant tabs */
+  .vtabs { display: flex; gap: 3px; margin-bottom: 8px; }
+  .vtab { flex: 1; padding: 5px 0; text-align: center; background: #1a1a30; border: 1px solid #333; cursor: pointer; font-size: 10px; color: #888; border-radius: 3px; }
+  .vtab.active { background: #22304a; border-color: #4488ff; color: #fff; }
+
+  /* Gear item list */
+  .gear-items { display: flex; flex-direction: column; gap: 3px; }
+  .gear-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px; background: #16162e; border: 1px solid #2a2a40; border-radius: 4px; cursor: pointer; }
+  .gear-item:hover { background: #1e1e3a; }
+  .gear-item.selected { border-color: #ffcc00; background: #22201a; }
+  .gear-item img { width: 28px; height: 28px; image-rendering: pixelated; object-fit: contain; }
+  .gear-item .name { font-size: 11px; color: #ccc; flex: 1; }
+  .gear-item .slot-tag { font-size: 9px; color: #666; background: #222; padding: 1px 4px; border-radius: 2px; }
+  .gear-item .vis-toggle { font-size: 14px; cursor: pointer; padding: 2px 4px; border-radius: 2px; user-select: none; flex-shrink: 0; }
+  .gear-item .vis-toggle:hover { background: #2a2a40; }
+  .gear-item.hidden-item { opacity: 0.4; }
+
+  /* Controls */
+  .controls { margin-top: 8px; }
+  .control-row { display: flex; align-items: center; gap: 6px; margin: 4px 0; }
+  .control-row label { font-size: 10px; color: #888; width: 55px; text-align: right; flex-shrink: 0; }
+  .control-row input[type="number"] { width: 58px; background: #1a1a30; border: 1px solid #444; color: #88ff44; padding: 3px 4px; font-family: monospace; font-size: 12px; border-radius: 2px; text-align: center; }
+  .control-row input[type="range"] { flex: 1; accent-color: #4488ff; }
+  .control-row .val { font-size: 11px; color: #88ff44; width: 35px; text-align: center; }
+
+  /* Buttons */
+  .btn { display: block; width: 100%; padding: 7px; margin: 3px 0; background: #1a2a3a; border: 1px solid #4488ff; color: #aaccff; cursor: pointer; font-family: monospace; font-size: 11px; border-radius: 3px; text-align: center; }
+  .btn:hover { background: #223344; }
+  .btn.green { border-color: #44cc44; color: #88ff88; background: #1a2a1a; }
+  .btn.green:hover { background: #223a22; }
+  .btn.yellow { border-color: #ffcc00; color: #ffdd66; background: #2a2a1a; }
+  .btn.red { border-color: #ff4444; color: #ff8888; background: #2a1a1a; }
+
+  /* Canvas area */
+  .canvas-wrap { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; }
+  canvas { image-rendering: pixelated; cursor: crosshair; border: 1px solid #333; }
+  .canvas-info { position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); font-size: 11px; color: #555; pointer-events: none; }
+
+  /* Status bar */
+  #status { font-size: 10px; color: #666; margin-top: 4px; min-height: 14px; }
+  #status.ok { color: #88ff44; }
+  #status.err { color: #ff4444; }
+
+  /* Keyboard hints */
+  .keyhints { font-size: 9px; color: #444; margin-top: 6px; line-height: 1.6; }
+  .keyhints kbd { background: #222; border: 1px solid #444; padding: 0 3px; border-radius: 2px; color: #888; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<div class="panel">
+  <h1>Gear Anchor Editor</h1>
+  <div class="hint">Reads from src/gear_catalog.json. Save writes directly back.</div>
+
+  <h2>Sprite Variant</h2>
+  <div class="vtabs" id="vtabs"></div>
+
+  <h2>Gear Items</h2>
+  <div class="gear-items" id="gear-items"></div>
+
+  <h2>Selected Gear</h2>
+  <div class="controls" id="controls">
+    <div style="color:#555;font-size:11px;">Click a gear item above</div>
+  </div>
+
+  <h2>Save</h2>
+  <button class="btn green" id="save-catalog">Save to gear_catalog.json</button>
+  <button class="btn" id="download-catalog">Download gear_catalog.json</button>
+  <div id="status"></div>
+
+  <div class="keyhints">
+    <kbd>Drag</kbd> move gear &nbsp; <kbd>Ctrl+Scroll</kbd> resize &nbsp;
+    <kbd>Ctrl+Shift+Scroll</kbd> width only &nbsp; <kbd>Ctrl+Alt+Scroll</kbd> height only<br>
+    <kbd>Arrow keys</kbd> nudge 1px &nbsp; <kbd>1-4</kbd> switch variant &nbsp; <kbd>F</kbd> flip horizontal<br>
+    <kbd>Ctrl+S</kbd> save &nbsp; <kbd>Drag handle</kbd> resize corner
+  </div>
+</div>
+
+<div class="canvas-wrap">
+  <canvas id="c"></canvas>
+  <div class="canvas-info" id="canvas-info"></div>
+</div>
+
+</div>
+
+<script>
+// ============================================================
+// CONFIG
+// ============================================================
+const CATALOG_PATH = '/src/gear_catalog.json';
+const VARIANTS = ['default', 'metal', 'muscle', 'wings'];
+const VARIANT_SRCS = {
+  default: '/data/eggthony.png',
+  metal:   '/data/metal_eggthony.png',
+  muscle:  '/data/muscle_eggthony.png',
+  wings:   '/data/eggthony_wings.png',
+};
+
+const PLAYER_W = 56, PLAYER_H = 128;
+const DRAW_ORDER = ['collar', 'body', 'head', 'accessory'];
+
+// ============================================================
+// STATE
+// ============================================================
+let catalog = {};   // raw catalog from JSON (preserved for non-visual fields)
+let items = {};     // working copy with editor-specific state (visible, flipH)
+let currentVariant = 'default';
+let selectedId = null;
+let variantImgs = {};
+let gearImgs = {};
+let dragging = false;
+let dragOffX = 0, dragOffY = 0;
+let resizing = false;
+let fileHandle = null; // File System Access API handle for direct saves
+
+// ============================================================
+// CANVAS SETUP
+// ============================================================
+const SCALE = 3;
+const CANVAS_W = 500;
+const CANVAS_H = 650;
+const canvas = document.getElementById('c');
+canvas.width = CANVAS_W;
+canvas.height = CANVAS_H;
+const ctx = canvas.getContext('2d');
+
+const playerCX = CANVAS_W / 2;
+const playerTop = CANVAS_H / 2 - (PLAYER_H * SCALE) / 2 + 30;
+
+// ============================================================
+// LOAD CATALOG FROM JSON
+// ============================================================
+async function loadCatalog() {
+  try {
+    const resp = await fetch(CATALOG_PATH + '?t=' + Date.now(), { cache: 'no-store' });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    catalog = await resp.json();
+    initFromCatalog();
+    setStatus('Loaded ' + Object.keys(catalog).length + ' items from catalog', 'ok');
+  } catch (e) {
+    setStatus('Failed to load catalog: ' + e.message, 'err');
+  }
+}
+
+function initFromCatalog() {
+  items = {};
+  for (const [id, def] of Object.entries(catalog)) {
+    items[id] = {
+      ...def,
+      // Catalog uses "data/gear/..." — Vite serves public/ at root, so prefix with /
+      editorSprite: '/' + def.sprite,
+      anchors: {},
+      flipH: {},
+      visible: true,
+    };
+    for (const v of VARIANTS) {
+      const src = def.anchors[v] || { x: 0, y: 0 };
+      items[id].flipH[v] = !!src.flipH;
+      items[id].anchors[v] = { x: src.x, y: src.y };
+    }
+  }
+  loadGearImages();
+  buildGearList();
+  buildVariantTabs();
+  updateControls();
+}
+
+// ============================================================
+// LOAD IMAGES
+// ============================================================
+function loadGearImages() {
+  let loadCount = 0;
+  const totalLoads = VARIANTS.length + Object.keys(items).length;
+
+  function onLoad() {
+    loadCount++;
+    if (loadCount >= totalLoads) render();
+  }
+
+  for (const v of VARIANTS) {
+    if (!variantImgs[v]) {
+      const img = new Image();
+      img.onload = onLoad;
+      img.onerror = onLoad;
+      img.src = VARIANT_SRCS[v];
+      variantImgs[v] = img;
+    } else {
+      onLoad();
+    }
+  }
+
+  gearImgs = {};
+  for (const [id, item] of Object.entries(items)) {
+    const img = new Image();
+    img.onload = onLoad;
+    img.onerror = onLoad;
+    img.src = item.editorSprite;
+    gearImgs[id] = img;
+  }
+}
+
+// ============================================================
+// BUILD CATALOG JSON FROM EDITOR STATE
+// ============================================================
+function buildCatalogJSON() {
+  const out = {};
+  for (const [id, item] of Object.entries(items)) {
+    // Start from the original catalog entry to preserve non-visual fields (buffs, rarity, etc.)
+    const orig = catalog[id] || {};
+    const anchors = {};
+    for (const v of VARIANTS) {
+      const a = { x: item.anchors[v].x, y: item.anchors[v].y };
+      if (item.flipH[v]) a.flipH = true;
+      anchors[v] = a;
+    }
+    out[id] = {
+      ...orig,
+      anchors,
+      drawW: item.drawW,
+      drawH: item.drawH,
+    };
+  }
+  return JSON.stringify(out, null, 2) + '\n';
+}
+
+// ============================================================
+// SAVE
+// ============================================================
+async function saveCatalog() {
+  const json = buildCatalogJSON();
+
+  // Try File System Access API (direct save, no dialog after first pick)
+  try {
+    if (!fileHandle) {
+      fileHandle = await window.showSaveFilePicker({
+        suggestedName: 'gear_catalog.json',
+        types: [{ description: 'JSON', accept: { 'application/json': ['.json'] } }],
+      });
+    }
+    const writable = await fileHandle.createWritable();
+    await writable.write(json);
+    await writable.close();
+    setStatus('Saved to ' + fileHandle.name + '! Vite will hot-reload.', 'ok');
+    return;
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      setStatus('Save cancelled', '');
+      return;
+    }
+    // File System Access not supported, fall through to download
+  }
+
+  downloadCatalog();
+}
+
+function downloadCatalog() {
+  const json = buildCatalogJSON();
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'gear_catalog.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  setStatus('Downloaded gear_catalog.json — move it to src/', 'ok');
+}
+
+function setStatus(msg, cls) {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = cls || '';
+}
+
+// ============================================================
+// COORDINATE HELPERS
+// ============================================================
+function canvasCoords(e) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: (e.clientX - rect.left) * (CANVAS_W / rect.width),
+    y: (e.clientY - rect.top) * (CANVAS_H / rect.height),
+  };
+}
+
+function gearRect(item) {
+  const a = item.anchors[currentVariant];
+  const gw = item.drawW * SCALE;
+  const gh = item.drawH * SCALE;
+  const gx = playerCX + a.x * SCALE - gw / 2;
+  const gy = playerTop + a.y * SCALE - gh / 2;
+  return { x: gx, y: gy, w: gw, h: gh };
+}
+
+// ============================================================
+// BUILD UI
+// ============================================================
+const vtabsEl = document.getElementById('vtabs');
+function buildVariantTabs() {
+  vtabsEl.innerHTML = '';
+  VARIANTS.forEach((v, i) => {
+    const tab = document.createElement('div');
+    tab.className = 'vtab' + (v === currentVariant ? ' active' : '');
+    tab.textContent = v + ` (${i+1})`;
+    tab.onclick = () => { currentVariant = v; buildVariantTabs(); updateControls(); render(); };
+    vtabsEl.appendChild(tab);
+  });
+}
+
+function buildGearList() {
+  const el = document.getElementById('gear-items');
+  el.innerHTML = '';
+  for (const [id, item] of Object.entries(items)) {
+    const div = document.createElement('div');
+    div.className = 'gear-item' + (selectedId === id ? ' selected' : '') + (!item.visible ? ' hidden-item' : '');
+    const vis = document.createElement('span');
+    vis.className = 'vis-toggle';
+    vis.textContent = item.visible ? '\u{1F441}' : '\u2014';
+    vis.title = item.visible ? 'Hide from canvas' : 'Show on canvas';
+    vis.onclick = (e) => { e.stopPropagation(); item.visible = !item.visible; buildGearList(); render(); };
+    div.appendChild(vis);
+    const img = document.createElement('img');
+    img.src = item.editorSprite;
+    div.appendChild(img);
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = item.name;
+    div.appendChild(name);
+    const tag = document.createElement('span');
+    tag.className = 'slot-tag';
+    tag.textContent = item.slot;
+    div.appendChild(tag);
+    div.onclick = () => { selectedId = id; buildGearList(); updateControls(); render(); };
+    el.appendChild(div);
+  }
+}
+
+function updateControls() {
+  const el = document.getElementById('controls');
+  if (!selectedId || !items[selectedId]) {
+    el.innerHTML = '<div style="color:#555;font-size:11px;">Click a gear item above</div>';
+    return;
+  }
+  const item = items[selectedId];
+  const a = item.anchors[currentVariant];
+
+  el.innerHTML = `
+    <div style="font-size:12px;color:#ffcc00;margin-bottom:4px;">${item.name} <span style="color:#666;">(${currentVariant})</span></div>
+    <div class="control-row">
+      <label>Anchor X</label>
+      <input type="number" id="ctrl-ax" value="${a.x}">
+      <input type="range" id="ctrl-ax-r" min="-60" max="60" value="${a.x}">
+    </div>
+    <div class="control-row">
+      <label>Anchor Y</label>
+      <input type="number" id="ctrl-ay" value="${a.y}">
+      <input type="range" id="ctrl-ay-r" min="-40" max="140" value="${a.y}">
+    </div>
+    <div class="control-row">
+      <label>Width</label>
+      <input type="number" id="ctrl-w" value="${item.drawW}" min="4" max="200">
+      <input type="range" id="ctrl-w-r" min="4" max="120" value="${item.drawW}">
+    </div>
+    <div class="control-row">
+      <label>Height</label>
+      <input type="number" id="ctrl-h" value="${item.drawH}" min="4" max="200">
+      <input type="range" id="ctrl-h-r" min="4" max="120" value="${item.drawH}">
+    </div>
+    <button class="btn" id="ctrl-flip" style="margin-top:6px;">${item.flipH[currentVariant] ? '\u27F7 Unflip Horizontal' : '\u27F7 Flip Horizontal'} (F)</button>
+    <button class="btn yellow" id="ctrl-copy-variant" style="margin-top:4px;">Copy ${currentVariant} \u2192 all variants</button>
+  `;
+
+  document.getElementById('ctrl-flip').onclick = () => {
+    item.flipH[currentVariant] = !item.flipH[currentVariant];
+    updateControls();
+    render();
+  };
+
+  const syncField = (numId, rangeId, setter) => {
+    const numEl = document.getElementById(numId);
+    const rangeEl = document.getElementById(rangeId);
+    const handler = (e) => {
+      const v = parseInt(e.target.value) || 0;
+      numEl.value = v;
+      rangeEl.value = v;
+      setter(v);
+      render();
+    };
+    numEl.addEventListener('input', handler);
+    rangeEl.addEventListener('input', handler);
+  };
+
+  syncField('ctrl-ax', 'ctrl-ax-r', v => { item.anchors[currentVariant].x = v; });
+  syncField('ctrl-ay', 'ctrl-ay-r', v => { item.anchors[currentVariant].y = v; });
+  syncField('ctrl-w', 'ctrl-w-r', v => { item.drawW = Math.max(4, v); });
+  syncField('ctrl-h', 'ctrl-h-r', v => { item.drawH = Math.max(4, v); });
+
+  document.getElementById('ctrl-copy-variant').onclick = () => {
+    const src = item.anchors[currentVariant];
+    const srcFlip = item.flipH[currentVariant];
+    for (const v of VARIANTS) {
+      item.anchors[v] = { x: src.x, y: src.y };
+      item.flipH[v] = srcFlip;
+    }
+    render();
+  };
+}
+
+// ============================================================
+// CANVAS INTERACTION
+// ============================================================
+canvas.addEventListener('mousedown', (e) => {
+  if (!selectedId) return;
+  const m = canvasCoords(e);
+  const item = items[selectedId];
+  const r = gearRect(item);
+
+  const hSize = 12;
+  if (m.x >= r.x + r.w - hSize && m.x <= r.x + r.w + hSize &&
+      m.y >= r.y + r.h - hSize && m.y <= r.y + r.h + hSize) {
+    resizing = true;
+    return;
+  }
+
+  if (m.x >= r.x && m.x <= r.x + r.w && m.y >= r.y && m.y <= r.y + r.h) {
+    dragging = true;
+    dragOffX = m.x - r.x;
+    dragOffY = m.y - r.y;
+    return;
+  }
+
+  for (const id of [...DRAW_ORDER].reverse().flatMap(slot => Object.keys(items).filter(id => items[id].slot === slot && items[id].visible))) {
+    const ir = gearRect(items[id]);
+    if (m.x >= ir.x && m.x <= ir.x + ir.w && m.y >= ir.y && m.y <= ir.y + ir.h) {
+      selectedId = id;
+      buildGearList();
+      updateControls();
+      render();
+      dragging = true;
+      dragOffX = m.x - ir.x;
+      dragOffY = m.y - ir.y;
+      return;
+    }
+  }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+  const m = canvasCoords(e);
+  if (!selectedId) return;
+  const item = items[selectedId];
+
+  if (dragging) {
+    const a = item.anchors[currentVariant];
+    a.x = Math.round((m.x - dragOffX + item.drawW * SCALE / 2 - playerCX) / SCALE);
+    a.y = Math.round((m.y - dragOffY + item.drawH * SCALE / 2 - playerTop) / SCALE);
+    updateControls();
+    render();
+    return;
+  }
+
+  if (resizing) {
+    const a = item.anchors[currentVariant];
+    const centerX = playerCX + a.x * SCALE;
+    const centerY = playerTop + a.y * SCALE;
+    item.drawW = Math.max(4, Math.round((m.x - centerX + item.drawW * SCALE / 2) / SCALE));
+    item.drawH = Math.max(4, Math.round((m.y - centerY + item.drawH * SCALE / 2) / SCALE));
+    updateControls();
+    render();
+    return;
+  }
+
+  const r = gearRect(item);
+  const hSize = 12;
+  if (m.x >= r.x + r.w - hSize && m.x <= r.x + r.w + hSize &&
+      m.y >= r.y + r.h - hSize && m.y <= r.y + r.h + hSize) {
+    canvas.style.cursor = 'nwse-resize';
+  } else if (m.x >= r.x && m.x <= r.x + r.w && m.y >= r.y && m.y <= r.y + r.h) {
+    canvas.style.cursor = 'move';
+  } else {
+    canvas.style.cursor = 'crosshair';
+  }
+});
+
+canvas.addEventListener('mouseup', () => { dragging = false; resizing = false; });
+canvas.addEventListener('mouseleave', () => { dragging = false; resizing = false; });
+
+// Scroll-to-resize requires Ctrl/Cmd held to prevent accidental trackpad resizes.
+// Ctrl+Scroll = resize both, Ctrl+Shift+Scroll = width only, Ctrl+Alt+Scroll = height only.
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  if (!selectedId) return;
+  if (!e.ctrlKey && !e.metaKey) return; // Require Ctrl/Cmd to resize
+  const item = items[selectedId];
+  const delta = e.deltaY > 0 ? -1 : 1;
+  if (e.shiftKey) {
+    item.drawW = Math.max(4, item.drawW + delta * 2);
+  } else if (e.altKey) {
+    item.drawH = Math.max(4, item.drawH + delta * 2);
+  } else {
+    item.drawW = Math.max(4, item.drawW + delta * 2);
+    item.drawH = Math.max(4, item.drawH + delta * 2);
+  }
+  updateControls();
+  render();
+}, { passive: false });
+
+document.addEventListener('keydown', (e) => {
+  // Ctrl+S to save
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    saveCatalog();
+    return;
+  }
+
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+  if (!selectedId) return;
+  const item = items[selectedId];
+  const a = item.anchors[currentVariant];
+  const step = e.shiftKey ? 5 : 1;
+
+  switch (e.key) {
+    case 'ArrowLeft':  a.x -= step; break;
+    case 'ArrowRight': a.x += step; break;
+    case 'ArrowUp':    a.y -= step; break;
+    case 'ArrowDown':  a.y += step; break;
+    case '1': currentVariant = 'default'; buildVariantTabs(); updateControls(); break;
+    case '2': currentVariant = 'metal';   buildVariantTabs(); updateControls(); break;
+    case '3': currentVariant = 'muscle';  buildVariantTabs(); updateControls(); break;
+    case '4': currentVariant = 'wings';   buildVariantTabs(); updateControls(); break;
+    case 'f': case 'F': item.flipH[currentVariant] = !item.flipH[currentVariant]; updateControls(); break;
+    default: return;
+  }
+  e.preventDefault();
+  updateControls();
+  render();
+});
+
+// ============================================================
+// RENDER
+// ============================================================
+function render() {
+  ctx.imageSmoothingEnabled = false;
+  ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
+
+  ctx.fillStyle = '#0a0a16';
+  ctx.fillRect(0, 0, CANVAS_W, CANVAS_H);
+
+  ctx.strokeStyle = '#151525';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < CANVAS_W; x += SCALE * 8) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, CANVAS_H); ctx.stroke();
+  }
+  for (let y = 0; y < CANVAS_H; y += SCALE * 8) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(CANVAS_W, y); ctx.stroke();
+  }
+
+  ctx.strokeStyle = '#1a1a35';
+  ctx.beginPath();
+  ctx.moveTo(playerCX, 0); ctx.lineTo(playerCX, CANVAS_H);
+  ctx.moveTo(0, playerTop + PLAYER_H * SCALE / 2); ctx.lineTo(CANVAS_W, playerTop + PLAYER_H * SCALE / 2);
+  ctx.stroke();
+
+  const vImg = variantImgs[currentVariant];
+  if (vImg && vImg.naturalWidth) {
+    const ratio = vImg.naturalWidth / vImg.naturalHeight;
+    const drawH = PLAYER_H * SCALE;
+    const drawW = drawH * ratio;
+    const drawX = playerCX - drawW / 2;
+    const drawY = playerTop + PLAYER_H * SCALE - drawH;
+    ctx.drawImage(vImg, drawX, drawY, drawW, drawH);
+  }
+
+  ctx.strokeStyle = 'rgba(255,255,0,0.15)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(playerCX - PLAYER_W * SCALE / 2, playerTop, PLAYER_W * SCALE, PLAYER_H * SCALE);
+
+  for (const slot of DRAW_ORDER) {
+    for (const [id, item] of Object.entries(items)) {
+      if (item.slot !== slot) continue;
+      if (!item.visible) continue;
+      const img = gearImgs[id];
+      if (!img || !img.naturalWidth) continue;
+      const r = gearRect(item);
+      const isSelected = id === selectedId;
+
+      if (selectedId && !isSelected) ctx.globalAlpha = 0.5;
+
+      if (item.flipH[currentVariant]) {
+        ctx.save();
+        ctx.translate(r.x + r.w / 2, r.y);
+        ctx.scale(-1, 1);
+        ctx.drawImage(img, -r.w / 2, 0, r.w, r.h);
+        ctx.restore();
+      } else {
+        ctx.drawImage(img, r.x, r.y, r.w, r.h);
+      }
+      ctx.globalAlpha = 1;
+
+      if (isSelected) {
+        ctx.strokeStyle = '#ffcc00';
+        ctx.lineWidth = 2;
+        ctx.setLineDash([6, 3]);
+        ctx.strokeRect(r.x - 1, r.y - 1, r.w + 2, r.h + 2);
+        ctx.setLineDash([]);
+
+        const a = item.anchors[currentVariant];
+        const ax = playerCX + a.x * SCALE;
+        const ay = playerTop + a.y * SCALE;
+        ctx.fillStyle = '#ff0044';
+        ctx.beginPath(); ctx.arc(ax, ay, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 1;
+        ctx.beginPath(); ctx.arc(ax, ay, 4, 0, Math.PI * 2); ctx.stroke();
+
+        ctx.fillStyle = '#ffcc00';
+        ctx.fillRect(r.x + r.w - 5, r.y + r.h - 5, 10, 10);
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(r.x + r.w - 5, r.y + r.h - 5, 10, 10);
+
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${item.drawW}x${item.drawH}`, r.x + r.w + 8, r.y + r.h);
+        ctx.fillText(`(${a.x}, ${a.y})`, r.x + r.w + 8, r.y + r.h - 12);
+      }
+    }
+  }
+
+  const info = document.getElementById('canvas-info');
+  const sel = selectedId ? items[selectedId] : null;
+  if (sel) {
+    const a = sel.anchors[currentVariant];
+    info.textContent = `${sel.name} | ${currentVariant} | anchor: (${a.x}, ${a.y}) | size: ${sel.drawW}x${sel.drawH} | scale: ${SCALE}x`;
+  } else {
+    info.textContent = `variant: ${currentVariant} | scale: ${SCALE}x | select a gear item`;
+  }
+}
+
+// ============================================================
+// WIRE UP BUTTONS
+// ============================================================
+document.getElementById('save-catalog').addEventListener('click', saveCatalog);
+document.getElementById('download-catalog').addEventListener('click', downloadCatalog);
+
+// ============================================================
+// INIT
+// ============================================================
+loadCatalog();
+</script>
+</body>
+</html>

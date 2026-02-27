@@ -515,7 +515,7 @@ export function damageEnemy(index, damage, knockX, knockY) {
   if (e.hp <= 0) {
     e.dying = true;
     e.deathTimer = 0.4;
-    S.score += e.score;
+    S.score += Math.round(e.score * (S.gear.totalBuffs ? S.gear.totalBuffs.scoreMult : 1));
     spawnParticles(e.x + e.w / 2, e.y + e.h / 2, e.color, 15, 200, 0.5);
     addShake(4, 0.1);
     playSound('kill');

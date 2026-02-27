@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate or edit pixel art sprites via OpenAI's gpt-image-1 API."""
+"""Generate or edit pixel art sprites via OpenAI's gpt-image-1.5 API."""
 
 import argparse
 import base64
@@ -44,7 +44,7 @@ def generate_sprite(prompt: str, output: str, size: str = "1024x1024", quality: 
 
     print(f"Generating sprite: {prompt[:80]}...")
     result = client.images.generate(
-        model="gpt-image-1",
+        model="gpt-image-1.5",
         prompt=prompt,
         size=size,
         quality=quality,
@@ -64,7 +64,7 @@ def edit_sprite(prompt: str, input_paths: list[str], output: str, size: str = "1
     print(f"Editing sprite ({label}): {prompt[:80]}...")
 
     result = client.images.edit(
-        model="gpt-image-1",
+        model="gpt-image-1.5",
         image=images if len(images) > 1 else images[0],
         prompt=prompt,
         size=size,
