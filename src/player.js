@@ -19,6 +19,7 @@ import { spawnParticles } from './effects.js';
 import { playSound } from './audio.js';
 import { fireLightning, firePoopBomb } from './weapons.js';
 import { autoAimMouse } from './input.js';
+import { drawGearOnPlayer } from './gear.js';
 
 // ============================================================
 // PLAYER UPDATE (physics, movement, jumping, collisions, timers)
@@ -48,7 +49,8 @@ export function updatePlayer(dt) {
   let moveX = 0;
   if (keys['a'] || keys['arrowleft']) moveX -= 1;
   if (keys['d'] || keys['arrowright']) moveX += 1;
-  player.vx = moveX * PLAYER_SPEED;
+  const gearSpeed = S.gear.totalBuffs ? S.gear.totalBuffs.speed : 0;
+  player.vx = moveX * (PLAYER_SPEED + gearSpeed);
 
   if (player.spiderDropTimer > 0) {
     // Spider Drop mode — hang from ceiling, 3x fire rate
@@ -82,14 +84,16 @@ export function updatePlayer(dt) {
     // Jump (SSBM-style double jump)
     const jumpInput = keys[' '] || keys['arrowup'];
     const jumpMult = player.muscleTimer > 0 ? 1.5 : 1;
+    const gearJump = S.gear.totalBuffs ? S.gear.totalBuffs.jumpForce : 0;
+    const baseJump = JUMP_FORCE + gearJump;
     if (jumpInput && !player.jumpHeld) {
       if (player.onGround) {
         // Grounded jump — full force (super jump in muscle mode)
-        player.vy = JUMP_FORCE * jumpMult;
+        player.vy = baseJump * jumpMult;
         player.onGround = false;
       } else if (player.airJumps > 0) {
         // Aerial double jump — slightly weaker, resets vertical momentum
-        player.vy = JUMP_FORCE * 0.85 * jumpMult;
+        player.vy = baseJump * 0.85 * jumpMult;
         player.airJumps--;
       }
     }
@@ -333,14 +337,22 @@ export function drawPlayer() {
     const drawX = px + PLAYER_W / 2 - drawW / 2;
     const drawY = py + PLAYER_H - drawH; // align feet
     ctx.drawImage(currentSprite, drawX, drawY, drawW, drawH);
+
+    // Draw gear on player (between base sprite and shimmer overlays)
+    drawGearOnPlayer(drawX, drawY, drawW, drawH);
+
     ctx.globalAlpha = 1;
+
+    // Expanded rect for shimmer to cover gear too
+    const shimX = drawX - 30, shimY = drawY - 30;
+    const shimW = drawW + 60, shimH = drawH + 60;
 
     // Metal shimmer
     if (isMetal) {
       ctx.globalCompositeOperation = 'source-atop';
       const shimmer = 0.15 + 0.1 * Math.sin(performance.now() * 0.008);
       ctx.fillStyle = `rgba(200,220,255,${shimmer})`;
-      ctx.fillRect(drawX, drawY, drawW, drawH);
+      ctx.fillRect(shimX, shimY, shimW, shimH);
     }
 
     // Muscle shimmer (pink/purple)
@@ -348,7 +360,7 @@ export function drawPlayer() {
       ctx.globalCompositeOperation = 'source-atop';
       const shimmer = 0.15 + 0.1 * Math.sin(performance.now() * 0.01);
       ctx.fillStyle = `rgba(220,130,255,${shimmer})`;
-      ctx.fillRect(drawX, drawY, drawW, drawH);
+      ctx.fillRect(shimX, shimY, shimW, shimH);
     }
 
     // Wings golden shimmer
@@ -356,14 +368,14 @@ export function drawPlayer() {
       ctx.globalCompositeOperation = 'source-atop';
       const shimmer = 0.12 + 0.08 * Math.sin(performance.now() * 0.007);
       ctx.fillStyle = `rgba(255,220,100,${shimmer})`;
-      ctx.fillRect(drawX, drawY, drawW, drawH);
+      ctx.fillRect(shimX, shimY, shimW, shimH);
     }
 
     // White flash overlay
     if (player.flashTimer > 0) {
       ctx.globalCompositeOperation = 'source-atop';
       ctx.fillStyle = `rgba(255,255,255,${player.flashTimer * 3})`;
-      ctx.fillRect(drawX, drawY, drawW, drawH);
+      ctx.fillRect(shimX, shimY, shimW, shimH);
     }
     ctx.restore();
 

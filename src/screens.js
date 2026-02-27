@@ -13,6 +13,7 @@ import { isMobile } from './input.js';
 import { isBossRound, bossAppearance } from './boss.js';
 import { getThemeIndex, initAmbientParticles, initBgDetails } from './world.js';
 import { startRound } from './waves.js';
+import { GEAR_ITEMS, awardDrop, recalcBuffs, saveGear, drawGearOnPlayer } from './gear.js';
 
 // ============================================================
 // LEADERBOARD
@@ -126,7 +127,9 @@ export function drawHUD() {
   const barX = 12, barY = 12, barW = 140, barH = 16;
   ctx.fillStyle = '#330000';
   ctx.fillRect(barX, barY, barW, barH);
-  const hpRatio = Math.max(0, player.hp / PLAYER_MAX_HP);
+  const gearMaxHp = S.gear.totalBuffs ? S.gear.totalBuffs.maxHp : 0;
+  const effectiveMaxHp = PLAYER_MAX_HP + gearMaxHp;
+  const hpRatio = Math.max(0, player.hp / effectiveMaxHp);
   const hpColor = hpRatio > 0.5 ? '#44cc44' : hpRatio > 0.25 ? '#cccc22' : '#cc2222';
   ctx.fillStyle = hpColor;
   ctx.fillRect(barX, barY, barW * hpRatio, barH);
@@ -137,7 +140,7 @@ export function drawHUD() {
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 11px monospace';
   ctx.textAlign = 'left';
-  ctx.fillText(`HP: ${Math.max(0, Math.ceil(player.hp))}/${PLAYER_MAX_HP}`, barX + 4, barY + 12);
+  ctx.fillText(`HP: ${Math.max(0, Math.ceil(player.hp))}/${effectiveMaxHp}`, barX + 4, barY + 12);
 
   // Round
   ctx.font = 'bold 14px monospace';
@@ -405,9 +408,11 @@ export function drawTitleScreen() {
   ctx.restore();
   ctx.textAlign = 'center';
 
-  // Draw Eggthony (big)
+  // Draw Eggthony (big) with equipped gear
   if (spriteLoaded) {
-    ctx.drawImage(eggSprite, W / 2 - 60, cy + 50, 120, 274);
+    const eggX = W / 2 - 60, eggY = cy + 50, eggW = 120, eggH = 274;
+    ctx.drawImage(eggSprite, eggX, eggY, eggW, eggH);
+    drawGearOnPlayer(eggX, eggY, eggW, eggH);
   }
 
   // Controls
@@ -445,6 +450,20 @@ export function drawTitleScreen() {
       const sc = String(e.score).padStart(6, ' ');
       ctx.fillText(`${rank}. ${nm} ${sc} R${e.round}`, W / 2, lbY + 18 + i * 16);
     }
+  }
+
+  // GEAR button (only show if player has gear)
+  if (S.gear.inventory.length > 0) {
+    const gearBtnX = W - 110, gearBtnY = PLATFORM_Y - 90, gearBtnW = 100, gearBtnH = 36;
+    ctx.fillStyle = '#1a1a2e';
+    ctx.fillRect(gearBtnX, gearBtnY, gearBtnW, gearBtnH);
+    ctx.strokeStyle = '#ffcc00';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(gearBtnX, gearBtnY, gearBtnW, gearBtnH);
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffcc00';
+    ctx.font = 'bold 14px monospace';
+    ctx.fillText('GEAR', gearBtnX + gearBtnW / 2, gearBtnY + 23);
   }
 
   // Blink
@@ -581,6 +600,42 @@ function drawDevMenu(ctx) {
     ctx.font = '11px monospace';
     ctx.fillText(getDevScores().length + ' local scores', W / 2, dlY + 135);
   }
+
+  // Dev gear controls
+  const gY = S.devLeaderboard ? dlY + 155 : dlY + 50;
+  ctx.fillStyle = '#888';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText('GEAR:', W / 2, gY);
+
+  const gBtnW = 120, gBtnH = 32, gGap = 10;
+  const gStartX = W / 2 - gBtnW - gGap / 2;
+
+  // GIVE ALL button
+  ctx.fillStyle = '#223322';
+  ctx.fillRect(gStartX, gY + 8, gBtnW, gBtnH);
+  ctx.strokeStyle = '#44ff44';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(gStartX, gY + 8, gBtnW, gBtnH);
+  ctx.fillStyle = '#44ff44';
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText('GIVE ALL', gStartX + gBtnW / 2, gY + 28);
+
+  // CLEAR button
+  const clearX = gStartX + gBtnW + gGap;
+  ctx.fillStyle = '#332222';
+  ctx.fillRect(clearX, gY + 8, gBtnW, gBtnH);
+  ctx.strokeStyle = '#ff4444';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(clearX, gY + 8, gBtnW, gBtnH);
+  ctx.fillStyle = '#ff6644';
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText('CLEAR', clearX + gBtnW / 2, gY + 28);
+
+  // Gear count
+  ctx.fillStyle = '#666';
+  ctx.font = '11px monospace';
+  ctx.fillText(S.gear.inventory.length + ' items in inventory', W / 2, gY + 54);
 }
 
 export function handleDevMenuClick(cx, cy) {
@@ -675,6 +730,31 @@ export function handleDevMenuClick(cx, cy) {
       return true;
     }
   }
+  // Dev gear controls
+  const dlYBase = startY + rows * (btnH + gap) + 116;
+  const gY = S.devLeaderboard ? dlYBase + 155 : dlYBase + 50;
+  const gBtnW = 120, gBtnH = 32, gGap = 10;
+  const gStartX = W / 2 - gBtnW - gGap / 2;
+  const clearX = gStartX + gBtnW + gGap;
+
+  // GIVE ALL
+  if (cx >= gStartX && cx <= gStartX + gBtnW && cy >= gY + 8 && cy <= gY + 8 + gBtnH) {
+    for (const id of Object.keys(GEAR_ITEMS)) {
+      awardDrop(id);
+    }
+    return true;
+  }
+  // CLEAR
+  if (cx >= clearX && cx <= clearX + gBtnW && cy >= gY + 8 && cy <= gY + 8 + gBtnH) {
+    S.gear.inventory = [];
+    for (const slot of Object.keys(S.gear.equipped)) {
+      S.gear.equipped[slot] = null;
+    }
+    recalcBuffs();
+    saveGear();
+    return true;
+  }
+
   return false;
 }
 
@@ -854,11 +934,25 @@ export function drawGameOver() {
   }
 
   if (S.gameOverPhase === 'showing') {
+    // GEAR button (only show if player has gear)
+    if (S.gear.inventory.length > 0) {
+      const goGearX = 14, goGearY = H - 60, goGearW = 80, goGearH = 36;
+      ctx.fillStyle = '#1a1a2e';
+      ctx.fillRect(goGearX, goGearY, goGearW, goGearH);
+      ctx.strokeStyle = '#ffcc00';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(goGearX, goGearY, goGearW, goGearH);
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#ffcc00';
+      ctx.font = 'bold 14px monospace';
+      ctx.fillText('GEAR', goGearX + goGearW / 2, goGearY + 23);
+    }
+
     S.titleBlink += 0.03;
     const alpha = 0.5 + 0.5 * Math.sin(S.titleBlink * 3);
     ctx.fillStyle = `rgba(255,255,255,${alpha})`;
     ctx.font = 'bold 22px monospace';
-    ctx.fillText(isMobile ? 'Tap to Restart' : 'Click to Restart', W / 2, H - 60);
+    ctx.fillText(isMobile ? 'Tap to Restart' : 'Click to Restart', W / 2, H - 40);
   }
 
   drawCrownAnimation();

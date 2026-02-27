@@ -164,9 +164,10 @@ export function setupTouch() {
     e.preventDefault();
     ensureAudio();
 
-    if (S.gameState === 'title') {
+    if (S.gameState === 'title' || S.gameState === 'gameOver' ||
+        S.gameState === 'equipScreen' || S.gameState === 'gearDrop') {
       const tc = touchToCanvas(e.changedTouches[0]);
-      if (S.devMenuOpen) {
+      if (S.gameState === 'title' && S.devMenuOpen) {
         const synth = new MouseEvent('click', {
           clientX: e.changedTouches[0].clientX,
           clientY: e.changedTouches[0].clientY
@@ -174,7 +175,7 @@ export function setupTouch() {
         canvas.dispatchEvent(synth);
         return;
       }
-      if (tc.x < 80 && tc.y < 80) {
+      if (S.gameState === 'title' && tc.x < 80 && tc.y < 80) {
         S.devTapCount++;
         S.devTapTimer = 1.0;
         if (S.devTapCount >= 5) {
@@ -183,11 +184,13 @@ export function setupTouch() {
         }
         return;
       }
-      canvas.dispatchEvent(new Event('click'));
-      return;
-    }
-    if (S.gameState === 'gameOver') {
-      canvas.dispatchEvent(new Event('click'));
+      // Dispatch synthetic click with real coordinates
+      const synth = new MouseEvent('click', {
+        bubbles: true,
+        clientX: e.changedTouches[0].clientX,
+        clientY: e.changedTouches[0].clientY
+      });
+      canvas.dispatchEvent(synth);
       return;
     }
 
