@@ -57,6 +57,67 @@ export function saveDevScores(scores) {
   localStorage.setItem('eggthonyDevScores', JSON.stringify(scores));
 }
 
+function formatLeaderboardNumber(value) {
+  return Number(value || 0).toLocaleString('en-US');
+}
+
+function fitLeaderboardText(ctx, text, maxWidth) {
+  const raw = String(text || '');
+  if (ctx.measureText(raw).width <= maxWidth) return raw;
+  let clipped = raw;
+  while (clipped.length > 0 && ctx.measureText(`${clipped}..`).width > maxWidth) {
+    clipped = clipped.slice(0, -1);
+  }
+  return clipped ? `${clipped}..` : '';
+}
+
+function drawLeaderboardTable({ topY, maxRows, rowStep, rowFont, highlightEntry }) {
+  const ctx = S.ctx;
+  const rows = S.leaderboardData.slice(0, maxRows);
+  if (rows.length <= 0) return;
+
+  // Keep columns compact and centered as a single block beneath the section title.
+  const rankW = 24;
+  const nameMaxW = 128;
+  const nameToScoreGap = 22;
+  const scoreToRoundGap = 52;
+  const blockWidth = rankW + nameMaxW + nameToScoreGap + scoreToRoundGap;
+  const rankX = Math.floor(W / 2 - blockWidth / 2);
+  const nameX = rankX + rankW;
+  const scoreX = nameX + nameMaxW + nameToScoreGap;
+  const roundX = scoreX + scoreToRoundGap;
+
+  ctx.save();
+  ctx.font = 'bold 10px monospace';
+  ctx.fillStyle = 'rgba(255,255,255,0.6)';
+  ctx.textAlign = 'left';
+  ctx.fillText('#', rankX, topY);
+  ctx.fillText('NAME', nameX, topY);
+  ctx.textAlign = 'right';
+  ctx.fillText('SCORE', scoreX, topY);
+  ctx.fillText('ROUND', roundX, topY);
+
+  for (let i = 0; i < rows.length; i++) {
+    const e = rows[i];
+    const rowY = topY + 14 + i * rowStep;
+    const isHighlight = highlightEntry ? highlightEntry(e) : false;
+    const rankText = `${i + 1}.`;
+    const nameText = fitLeaderboardText(ctx, e.name, nameMaxW);
+    const scoreText = formatLeaderboardNumber(e.score);
+    const roundText = `R${e.round || 0}`;
+
+    ctx.fillStyle = isHighlight ? '#ffcc00' : '#ccc';
+    ctx.font = rowFont;
+    ctx.textAlign = 'left';
+    ctx.fillText(rankText, rankX, rowY);
+    ctx.fillText(nameText, nameX, rowY);
+    ctx.textAlign = 'right';
+    ctx.fillText(scoreText, scoreX, rowY);
+    ctx.fillText(roundText, roundX, rowY);
+  }
+  ctx.restore();
+}
+
 // ============================================================
 // NAME INPUT OVERLAY
 // ============================================================
@@ -436,15 +497,7 @@ export function drawTitleScreen() {
     ctx.fillStyle = '#ffcc00';
     ctx.font = 'bold 14px monospace';
     ctx.fillText(S.devLeaderboard ? 'TOP SCORES (DEV)' : 'TOP SCORES', W / 2, lbY);
-    for (let i = 0; i < Math.min(S.leaderboardData.length, 5); i++) {
-      const e = S.leaderboardData[i];
-      ctx.fillStyle = '#999';
-      ctx.font = '12px monospace';
-      const rank = String(i + 1).padStart(2, ' ');
-      const nm = e.name.length > 10 ? e.name.slice(0, 10) : e.name.padEnd(10, ' ');
-      const sc = String(e.score).padStart(6, ' ');
-      ctx.fillText(`${rank}. ${nm} ${sc} R${e.round}`, W / 2, lbY + 18 + i * 16);
-    }
+    drawLeaderboardTable({ topY: lbY + 18, maxRows: 5, rowStep: 16, rowFont: '12px monospace' });
   }
 
   // Blink
@@ -841,16 +894,13 @@ export function drawGameOver() {
     ctx.fillText(S.devLeaderboard ? 'TOP SCORES (DEV)' : 'TOP SCORES', W / 2, startY);
 
     const savedName = localStorage.getItem('eggthonyName') || '';
-    for (let i = 0; i < Math.min(S.leaderboardData.length, 10); i++) {
-      const e = S.leaderboardData[i];
-      const isPlayer = e.name === savedName && e.score === S.score && e.round === S.round;
-      ctx.fillStyle = isPlayer ? '#ffcc00' : '#ccc';
-      ctx.font = '14px monospace';
-      const rank = String(i + 1).padStart(2, ' ');
-      const nm = e.name.length > 10 ? e.name.slice(0, 10) : e.name.padEnd(10, ' ');
-      const sc = String(e.score).padStart(6, ' ');
-      ctx.fillText(`${rank}. ${nm} ${sc} R${e.round}`, W / 2, startY + 22 + i * 18);
-    }
+    drawLeaderboardTable({
+      topY: startY + 22,
+      maxRows: 10,
+      rowStep: 18,
+      rowFont: '14px monospace',
+      highlightEntry: e => e.name === savedName && e.score === S.score && e.round === S.round,
+    });
   }
 
   if (S.gameOverPhase === 'showing') {
