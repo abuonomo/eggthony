@@ -102,15 +102,29 @@ export function updateCampSpider(dt) {
   const { player, keys } = S;
   const pcx = player.x + PLAYER_W / 2;
   const onFloatPlat = player.onGround && (player.y + PLAYER_H) < PLATFORM_Y - 10;
+  const moveLeft = keys['a'] || keys['arrowleft'];
+  const moveRight = keys['d'] || keys['arrowright'];
+  const hasHorizontalIntent = moveLeft !== moveRight;
+  const hasVerticalIntent = keys[' '] || keys['arrowup'] || keys['w'] || keys['joyup'] || keys['s'] || keys['arrowdown'];
+  const movedPastCampRadius = Math.abs(pcx - S.campX) > CAMP_RADIUS;
+  // Treat strong upward launch as deliberate movement; small knockback hops should not cancel camping.
+  const tookDeliberateAirMove = !player.onGround && (hasVerticalIntent || player.vy < -350);
+  const shouldResetCamp = onFloatPlat || (movedPastCampRadius && hasHorizontalIntent) || tookDeliberateAirMove;
 
-  if (onFloatPlat || !player.onGround || Math.abs(pcx - S.campX) > CAMP_RADIUS) {
+  if (shouldResetCamp) {
     S.campTimer = 0;
     S.campX = pcx;
     if (S.campSpider && S.campSpider.state !== 'grabbed') {
       S.campSpider.state = 'retreating';
     }
   } else {
-    S.campTimer += dt;
+    const canAdvanceCamp = player.onGround && !onFloatPlat && !movedPastCampRadius;
+    if (canAdvanceCamp) {
+      S.campTimer += dt;
+    } else if (movedPastCampRadius) {
+      // Involuntary horizontal drift: re-anchor without forcing a full spider retreat/reset.
+      S.campX = pcx;
+    }
   }
 
   if (!S.campSpider && S.campTimer >= CAMP_SPIDER_DELAY) {
