@@ -1,6 +1,8 @@
 // ============================================================
 // AUDIO ENGINE (Web Audio API - procedural SFX)
 // ============================================================
+import { random } from './rng.js';
+
 export let audioCtx = null;
 let audioUnlocked = false;
 
@@ -232,7 +234,7 @@ export function playNoise(duration, volume) {
   const bufferSize = audioCtx.sampleRate * duration;
   const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
   const data = buffer.getChannelData(0);
-  for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * volume;
+  for (let i = 0; i < bufferSize; i++) data[i] = (random() * 2 - 1) * volume;
   const source = audioCtx.createBufferSource();
   const gain = audioCtx.createGain();
   source.buffer = buffer;
@@ -292,13 +294,14 @@ export function isVoicePlaying() {
 }
 
 export function playVoice(name, force) {
+  if (!audioCtx) return;
   if (!force && isVoicePlaying()) return;
   if (activeVoice) {
     activeVoice.pause();
     activeVoice.currentTime = 0;
   }
 
-  if (name === 'start' && startClipBuffer && audioCtx) {
+  if (name === 'start' && startClipBuffer) {
     audioCtx.decodeAudioData(startClipBuffer.slice(0), (decoded) => {
       const source = audioCtx.createBufferSource();
       source.buffer = decoded;
@@ -315,4 +318,10 @@ export function playVoice(name, force) {
   clip.currentTime = 0;
   clip.play().catch(() => {});
   activeVoice = clip;
+}
+
+export function playClip(clip) {
+  if (!audioCtx) return;
+  clip.currentTime = 0;
+  clip.play().catch(() => {});
 }

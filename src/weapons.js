@@ -8,6 +8,7 @@ import {
   POOP_DAMAGE, POOP_AOE_RADIUS, POOP_COOLDOWN, POOP_SIZE, POOP_GRAVITY,
   SPIDER_DROP_DURATION, SPIDER_DROP_CLUTCH_Y, SPIDER_DROP_Y,
 } from './constants.js';
+import { random } from './rng.js';
 import { spawnParticles, spawnDamageNumber, addShake } from './effects.js';
 import { playSound, playNoise, snotSniffleClip, snotLaunchClip } from './audio.js';
 import { rectsOverlap } from './utils.js';
@@ -21,7 +22,7 @@ import { damageBoss } from './boss.js';
 function generateLightningSegments() {
   const segs = [];
   for (let i = 0; i < 5; i++) {
-    segs.push({ ox: (Math.random() - 0.5) * 10, oy: (Math.random() - 0.5) * 10 });
+    segs.push({ ox: (random() - 0.5) * 10, oy: (random() - 0.5) * 10 });
   }
   return segs;
 }
@@ -56,8 +57,8 @@ export function updateLightningBolts(dt) {
 
     // Regenerate jitter
     for (const s of b.segments) {
-      s.ox = (Math.random() - 0.5) * 12;
-      s.oy = (Math.random() - 0.5) * 12;
+      s.ox = (random() - 0.5) * 12;
+      s.oy = (random() - 0.5) * 12;
     }
 
     // Off screen or expired
@@ -530,15 +531,15 @@ function poopAOEDamage(cx, cy) {
 
   // Brown/green splat particles
   for (let i = 0; i < 16; i++) {
-    const angle = (i / 16) * Math.PI * 2 + Math.random() * 0.3;
-    const speed = 80 + Math.random() * 120;
+    const angle = (i / 16) * Math.PI * 2 + random() * 0.3;
+    const speed = 80 + random() * 120;
     particles.push({
       x: cx, y: cy,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed - 40,
       life: 0.5, maxLife: 0.5,
-      color: Math.random() < 0.5 ? '#8B6914' : '#6B8E23',
-      size: 3 + Math.random() * 3
+      color: random() < 0.5 ? '#8B6914' : '#6B8E23',
+      size: 3 + random() * 3
     });
   }
 
@@ -585,14 +586,14 @@ export function updatePoopBombs(dt) {
     b.y += b.vy * dt;
 
     // Trail particles
-    if (Math.random() < 0.4) {
+    if (random() < 0.4) {
       particles.push({
-        x: b.x + (Math.random() - 0.5) * 6,
+        x: b.x + (random() - 0.5) * 6,
         y: b.y - 2,
-        vx: (Math.random() - 0.5) * 20,
-        vy: -10 - Math.random() * 20,
+        vx: (random() - 0.5) * 20,
+        vy: -10 - random() * 20,
         life: 0.3, maxLife: 0.3,
-        color: Math.random() < 0.5 ? '#8B6914' : '#6B8E23', size: 2
+        color: random() < 0.5 ? '#8B6914' : '#6B8E23', size: 2
       });
     }
 

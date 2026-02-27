@@ -5,6 +5,7 @@ import {
   CAMP_SPIDER_ESCAPE_DMG, CAMP_RADIUS, SPIDER_DROP_DURATION,
   SPIDER_DROP_CLUTCH_Y, SPIDER_DROP_Y,
 } from './constants.js';
+import { random } from './rng.js';
 import { playSound, playVoice } from './audio.js';
 import { spiderSprite, spiderSpriteLoaded } from './sprites.js';
 
@@ -13,16 +14,16 @@ import { spiderSprite, spiderSpriteLoaded } from './sprites.js';
 // ============================================================
 export function spawnParticles(x, y, color, count, speed, life) {
   for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const spd = Math.random() * speed;
+    const angle = random() * Math.PI * 2;
+    const spd = random() * speed;
     S.particles.push({
       x, y,
       vx: Math.cos(angle) * spd,
-      vy: Math.sin(angle) * spd - Math.random() * 100,
-      life: life * (0.5 + Math.random() * 0.5),
+      vy: Math.sin(angle) * spd - random() * 100,
+      life: life * (0.5 + random() * 0.5),
       maxLife: life,
       color,
-      size: Math.random() * 4 + 2
+      size: random() * 4 + 2
     });
   }
 }
@@ -156,7 +157,7 @@ export function updateCampSpider(dt) {
 
     case 'grabbed':
       sp.grabTimer += dt;
-      const wiggle = Math.sin(performance.now() * 0.015) * 8;
+      const wiggle = Math.sin(S.tickCount * 0.9) * 8;
       player.x = sp.x - PLAYER_W / 2 + wiggle;
       player.y -= 120 * dt;
       sp.y = player.y - 10;

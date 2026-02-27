@@ -3,7 +3,8 @@
 // ============================================================
 import { S } from './state.js';
 import { PLAYER_W, PLAYER_H } from './constants.js';
-import CATALOG from './gear_catalog.json';
+import { random } from './rng.js';
+import CATALOG from './gear_catalog.json' with { type: 'json' };
 
 // ============================================================
 // SLOT & RARITY DEFINITIONS
@@ -142,7 +143,7 @@ export function rollDrop(round) {
   if (round < 4) return null;
   // Drop probability: 30% at round 4, +10% per round after, max 80%
   const prob = Math.min(0.8, 0.3 + (round - 4) * 0.1);
-  if (Math.random() > prob) return null;
+  if (random() > prob) return null;
 
   // Build weighted pool filtered by minRound
   const pool = [];
@@ -156,7 +157,7 @@ export function rollDrop(round) {
   if (pool.length === 0) return null;
 
   const totalWeight = pool.reduce((sum, p) => sum + p.weight, 0);
-  let roll = Math.random() * totalWeight;
+  let roll = random() * totalWeight;
   for (const p of pool) {
     roll -= p.weight;
     if (roll <= 0) return p.id;

@@ -4,6 +4,7 @@ import {
   IFRAME_DURATION, CONTACT_KNOCKBACK, ENEMY_TYPES,
   SNOT_STORM_DURATION,
 } from './constants.js';
+import { random } from './rng.js';
 import { playSound, playNoise, playVoice } from './audio.js';
 import {
   gruntSprite, gruntSpriteLoaded,
@@ -31,11 +32,11 @@ export function createEnemy(type, round) {
   const hpBonus = (round - 1) * 15;
   const w = def.baseW;
   const h = def.baseH;
-  const spawnX = PLATFORM_X + Math.random() * (PLATFORM_W - w);
+  const spawnX = PLATFORM_X + random() * (PLATFORM_W - w);
   return {
     type,
     x: spawnX,
-    y: -h - Math.random() * 200,
+    y: -h - random() * 200,
     w, h,
     vx: 0,
     vy: 0,
@@ -51,20 +52,20 @@ export function createEnemy(type, round) {
     deathTimer: 0,
     flashTimer: 0,
     shootCooldown: def.shootCooldown || 0,
-    shootTimer: (def.shootCooldown || 0) * Math.random(),
+    shootTimer: (def.shootCooldown || 0) * random(),
     charging: false,
     chargeTimer: 0,
-    facingRight: Math.random() > 0.5,
-    animTimer: Math.random() * Math.PI * 2,
+    facingRight: random() > 0.5,
+    animTimer: random() * Math.PI * 2,
     freezeTimer: 0
   };
 }
 
 export function spawnEnemyForRound(round) {
   let type = 'grunt';
-  if (round >= 5 && Math.random() < 0.25) {
+  if (round >= 5 && random() < 0.25) {
     type = 'brute';
-  } else if (round >= 3 && Math.random() < 0.35) {
+  } else if (round >= 3 && random() < 0.35) {
     type = 'spitter';
   }
   S.enemies.push(createEnemy(type, round));
@@ -264,7 +265,7 @@ export function updateEnemies(dt) {
           spawnDamageNumber(player.x + PLAYER_W / 2, player.y, e.damage, '#ff4444');
           addShake(6, 0.15);
           playSound('hurt');
-          if (Math.random() < 0.3) playVoice('bad');
+          if (random() < 0.3) playVoice('bad');
         }
       }
     }
@@ -332,7 +333,7 @@ export function updateEnemyProjectiles(dt) {
           spawnParticles(p.x, p.y, '#ff44ff', 8, 80, 0.3);
           addShake(4, 0.1);
           playSound('hurt');
-          if (Math.random() < 0.3) playVoice('bad');
+          if (random() < 0.3) playVoice('bad');
         }
         enemyProjectiles.splice(i, 1);
       }
@@ -521,7 +522,7 @@ export function damageEnemy(index, damage, knockX, knockY) {
     addShake(4, 0.1);
     playSound('kill');
     playNoise(0.15, 0.15);
-    if (Math.random() < 0.25) {
+    if (random() < 0.25) {
       playVoice(S.goodClipToggle ? 'good1' : 'good2');
       S.goodClipToggle = !S.goodClipToggle;
     }

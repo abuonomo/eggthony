@@ -5,6 +5,7 @@ import {
   FLOAT_PLAT_W, FLOAT_PLAT_H, FLOAT_PLAT_LIFETIME, FLOAT_PLAT_WARN_TIME,
   FLOAT_PLAT_FADE_IN, FLOAT_PLAT_SPAWN_CD, FLOAT_PLAT_MAX, FLOAT_PLAT_SLOTS,
 } from './constants.js';
+import { random } from './rng.js';
 import { spawnParticles } from './effects.js';
 import { playSound } from './audio.js';
 
@@ -38,34 +39,34 @@ export function createAmbientParticle(theme, randomY) {
   const t = theme.ambientType;
   if (t === 'stars') {
     return {
-      x: Math.random() * W,
-      y: randomY ? Math.random() * H : 0,
-      size: Math.random() * 2 + 0.5,
-      speed: Math.random() * 20 + 5,
-      brightness: Math.random() * 0.5 + 0.5,
+      x: random() * W,
+      y: randomY ? random() * H : 0,
+      size: random() * 2 + 0.5,
+      speed: random() * 20 + 5,
+      brightness: random() * 0.5 + 0.5,
       type: 'stars'
     };
   } else if (t === 'spores') {
     return {
-      x: Math.random() * W,
-      y: randomY ? Math.random() * H : H + Math.random() * 40,
-      size: Math.random() * 3 + 1.5,
-      speed: -(15 + Math.random() * 25), // drift upward
-      drift: (Math.random() - 0.5) * 20,
-      brightness: Math.random() * 0.6 + 0.3,
-      glowPhase: Math.random() * Math.PI * 2,
+      x: random() * W,
+      y: randomY ? random() * H : H + random() * 40,
+      size: random() * 3 + 1.5,
+      speed: -(15 + random() * 25), // drift upward
+      drift: (random() - 0.5) * 20,
+      brightness: random() * 0.6 + 0.3,
+      glowPhase: random() * Math.PI * 2,
       type: 'spores'
     };
   } else { // embers
     return {
-      x: Math.random() * W,
-      y: randomY ? Math.random() * H : H + Math.random() * 20,
-      size: Math.random() * 2.5 + 1,
-      speed: -(40 + Math.random() * 60), // fast upward
-      drift: (Math.random() - 0.5) * 30,
-      brightness: Math.random() * 0.8 + 0.2,
-      glowPhase: Math.random() * Math.PI * 2,
-      hue: Math.random() < 0.6 ? 0 : 1, // 0=orange, 1=red
+      x: random() * W,
+      y: randomY ? random() * H : H + random() * 20,
+      size: random() * 2.5 + 1,
+      speed: -(40 + random() * 60), // fast upward
+      drift: (random() - 0.5) * 30,
+      brightness: random() * 0.8 + 0.2,
+      glowPhase: random() * Math.PI * 2,
+      hue: random() < 0.6 ? 0 : 1, // 0=orange, 1=red
       type: 'embers'
     };
   }
@@ -76,14 +77,14 @@ export function updateAmbientParticles(dt) {
   for (const s of S.ambientParticles) {
     if (s.type === 'stars') {
       s.y += s.speed * dt;
-      if (s.y > H) { s.y = 0; s.x = Math.random() * W; }
-      s.brightness = 0.5 + 0.5 * Math.sin(performance.now() * 0.001 * s.speed * 0.1);
+      if (s.y > H) { s.y = 0; s.x = random() * W; }
+      s.brightness = 0.5 + 0.5 * Math.sin(S.tickCount * 0.06 * s.speed * 0.1);
     } else if (s.type === 'spores') {
       s.y += s.speed * dt;
       s.x += s.drift * dt;
       s.glowPhase += dt * 2;
       s.brightness = 0.3 + 0.3 * Math.sin(s.glowPhase);
-      if (s.y < -10) { s.y = H + 10; s.x = Math.random() * W; }
+      if (s.y < -10) { s.y = H + 10; s.x = random() * W; }
       if (s.x < -10) s.x = W + 10;
       if (s.x > W + 10) s.x = -10;
     } else { // embers
@@ -91,7 +92,7 @@ export function updateAmbientParticles(dt) {
       s.x += s.drift * dt;
       s.glowPhase += dt * 4;
       s.brightness = 0.4 + 0.4 * Math.sin(s.glowPhase);
-      if (s.y < -10) { s.y = H + 10; s.x = Math.random() * W; }
+      if (s.y < -10) { s.y = H + 10; s.x = random() * W; }
       if (s.x < -10) s.x = W + 10;
       if (s.x > W + 10) s.x = -10;
     }
@@ -141,28 +142,28 @@ export function initBgDetails() {
     S.bgDetails.hullPanels = [];
     for (let i = 0; i < 8; i++) {
       S.bgDetails.hullPanels.push({
-        x: Math.random() * W,
-        y: Math.random() * PLATFORM_Y * 0.8,
-        w: 40 + Math.random() * 80,
-        h: 30 + Math.random() * 60
+        x: random() * W,
+        y: random() * PLATFORM_Y * 0.8,
+        w: 40 + random() * 80,
+        h: 30 + random() * 60
       });
     }
   } else if (theme.ambientType === 'spores') {
     // Hanging vines at top
     S.bgDetails.vines = [];
     for (let i = 0; i < 12; i++) {
-      const x = 20 + Math.random() * (W - 40);
-      const segments = 4 + Math.floor(Math.random() * 5);
+      const x = 20 + random() * (W - 40);
+      const segments = 4 + Math.floor(random() * 5);
       const vine = { x, segments: [], berries: [] };
       let cy = 0;
       for (let j = 0; j < segments; j++) {
-        cy += 12 + Math.random() * 18;
-        vine.segments.push({ x: x + (Math.random() - 0.5) * 20, y: cy });
+        cy += 12 + random() * 18;
+        vine.segments.push({ x: x + (random() - 0.5) * 20, y: cy });
       }
       // Glowing berries at ends
-      if (Math.random() < 0.6) {
+      if (random() < 0.6) {
         const last = vine.segments[vine.segments.length - 1];
-        vine.berries.push({ x: last.x, y: last.y + 4, phase: Math.random() * Math.PI * 2 });
+        vine.berries.push({ x: last.x, y: last.y + 4, phase: random() * Math.PI * 2 });
       }
       S.bgDetails.vines.push(vine);
     }
@@ -170,9 +171,9 @@ export function initBgDetails() {
     S.bgDetails.canopy = [];
     for (let i = 0; i < 6; i++) {
       S.bgDetails.canopy.push({
-        x: Math.random() * W,
-        r: 40 + Math.random() * 60,
-        y: -10 + Math.random() * 20
+        x: random() * W,
+        r: 40 + random() * 60,
+        y: -10 + random() * 20
       });
     }
   } else { // embers / volcanic
@@ -180,21 +181,21 @@ export function initBgDetails() {
     S.bgDetails.stalactites = [];
     for (let i = 0; i < 10; i++) {
       S.bgDetails.stalactites.push({
-        x: 20 + Math.random() * (W - 40),
-        w: 6 + Math.random() * 10,
-        h: 20 + Math.random() * 50
+        x: 20 + random() * (W - 40),
+        w: 6 + random() * 10,
+        h: 20 + random() * 50
       });
     }
     // Magma vein cracks in background
     S.bgDetails.magmaVeins = [];
     for (let i = 0; i < 5; i++) {
-      const startX = Math.random() * W;
-      const startY = 50 + Math.random() * (PLATFORM_Y - 100);
+      const startX = random() * W;
+      const startY = 50 + random() * (PLATFORM_Y - 100);
       const segs = [];
       let cx = startX, cy = startY;
-      for (let j = 0; j < 4 + Math.floor(Math.random() * 4); j++) {
-        cx += (Math.random() - 0.5) * 60;
-        cy += 10 + Math.random() * 30;
+      for (let j = 0; j < 4 + Math.floor(random() * 4); j++) {
+        cx += (random() - 0.5) * 60;
+        cy += 10 + random() * 30;
         segs.push({ x: cx, y: cy });
       }
       S.bgDetails.magmaVeins.push({ startX, startY, segs });
@@ -592,7 +593,7 @@ export function updateFloatingPlatforms(dt) {
       if (!S.occupiedSlots.has(i)) available.push(i);
     }
     if (available.length > 0) {
-      const slotIdx = available[Math.floor(Math.random() * available.length)];
+      const slotIdx = available[Math.floor(random() * available.length)];
       const slot = FLOAT_PLAT_SLOTS[slotIdx];
       S.occupiedSlots.add(slotIdx);
       S.floatingPlatforms.push({
@@ -629,7 +630,7 @@ export function updateFloatingPlatforms(dt) {
       const warnProgress = (fp.lifetime - FLOAT_PLAT_LIFETIME) / FLOAT_PLAT_WARN_TIME;
       fp.alpha = 1;
       // Shake intensifies over warning period
-      fp.shakeOffset = (Math.random() - 0.5) * warnProgress * 6;
+      fp.shakeOffset = (random() - 0.5) * warnProgress * 6;
       if (fp.lifetime >= FLOAT_PLAT_LIFETIME + FLOAT_PLAT_WARN_TIME) {
         fp.phase = 'gone';
       }

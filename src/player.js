@@ -9,6 +9,7 @@ import {
   SPIDER_DROP_Y, LIGHTNING_COOLDOWN,
   POOP_COOLDOWN,
 } from './constants.js';
+import { random } from './rng.js';
 import {
   eggSprite, spriteLoaded,
   metalSprite, metalSpriteLoaded,
@@ -60,7 +61,7 @@ export function updatePlayer(dt) {
   if (player.spiderDropTimer > 0) {
     // Spider Drop mode — hang from ceiling, 3x fire rate
     player.spiderDropTimer -= dt;
-    player.y = SPIDER_DROP_Y + Math.sin(performance.now() * 0.004) * 3;
+    player.y = SPIDER_DROP_Y + Math.sin(S.tickCount * 0.24) * 3;
     player.vy = 0;
     player.onGround = false;
     player.x += player.vx * dt;
@@ -80,7 +81,7 @@ export function updatePlayer(dt) {
       }
     } else {
       // Gentle sine bob at target height
-      player.y = targetY - PLAYER_H / 2 + Math.sin(performance.now() * 0.003) * 4;
+      player.y = targetY - PLAYER_H / 2 + Math.sin(S.tickCount * 0.18) * 4;
       player.vy = 0;
     }
     player.x += player.vx * dt;
@@ -200,10 +201,10 @@ export function updatePlayer(dt) {
       particles.push({
         x: pcxW + Math.cos(angle) * 10,
         y: pcyW + Math.sin(angle) * 10,
-        vx: Math.cos(angle) * 80 + (Math.random() - 0.5) * 40,
+        vx: Math.cos(angle) * 80 + (random() - 0.5) * 40,
         vy: Math.sin(angle) * 80 - 30,
         life: 0.8, maxLife: 0.8,
-        color: Math.random() < 0.5 ? '#ffdd88' : '#ffffff', size: 3
+        color: random() < 0.5 ? '#ffdd88' : '#ffffff', size: 3
       });
     }
     playSound('platCrumble');
@@ -273,14 +274,14 @@ export function drawPlayer() {
     ctx.arc(cx, cy, auraRadius - 5, 0, Math.PI * 2);
     ctx.stroke();
     // Spawn feather particles while flying
-    if (Math.random() < 0.15) {
+    if (random() < 0.15) {
       particles.push({
-        x: cx + (Math.random() - 0.5) * 40,
+        x: cx + (random() - 0.5) * 40,
         y: cy + PLAYER_H / 2,
-        vx: (Math.random() - 0.5) * 30,
-        vy: 20 + Math.random() * 30,
+        vx: (random() - 0.5) * 30,
+        vy: 20 + random() * 30,
         life: 0.6, maxLife: 0.6,
-        color: Math.random() < 0.5 ? '#ffdd88' : '#fff8e0', size: 2
+        color: random() < 0.5 ? '#ffdd88' : '#fff8e0', size: 2
       });
     }
   }

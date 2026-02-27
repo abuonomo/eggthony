@@ -11,7 +11,8 @@ import {
   CHRIS_CHUG_TIME, CHRIS_SPLASH_RADIUS, CHRIS_SPLASH_DAMAGE,
   CHRIS_CAN_SPEED, CHRIS_CAN_GRAVITY, CHRIS_ENTRY_SPEED, CHRIS_CHARGE_DAMAGE,
 } from './constants.js';
-import { playSound, playNoise, playVoice, dwyerClip } from './audio.js';
+import { random } from './rng.js';
+import { playSound, playNoise, playVoice, playClip, dwyerClip } from './audio.js';
 import {
   metalHatSprite, metalHatSpriteLoaded,
   smoothieSprite, smoothieSpriteLoaded,
@@ -33,12 +34,12 @@ import { damageBoss } from './boss.js';
 // METAL HAT POWERUP
 // ============================================================
 export function spawnMetalHat() {
-  const x = PLATFORM_X + 40 + Math.random() * (PLATFORM_W - 80);
+  const x = PLATFORM_X + 40 + random() * (PLATFORM_W - 80);
   S.metalHat = {
     x,
     y: -HAT_SIZE,
-    vy: 60 + Math.random() * 40,
-    bobTimer: Math.random() * Math.PI * 2,
+    vy: 60 + random() * 40,
+    bobTimer: random() * Math.PI * 2,
     landed: false,
     landY: 0
   };
@@ -52,7 +53,7 @@ export function updateMetalHat(dt) {
     S.hatSpawnTimer -= dt;
     if (S.hatSpawnTimer <= 0 && (enemies.length > 0 || (boss && !boss.dying))) {
       const luck = S.gear.totalBuffs ? S.gear.totalBuffs.dropLuck : 0;
-      S.hatSpawnTimer = (15 + Math.random() * 10) * (1 - luck);
+      S.hatSpawnTimer = (15 + random() * 10) * (1 - luck);
       spawnMetalHat();
     }
     return;
@@ -124,12 +125,12 @@ export function drawMetalHat() {
 // BLUEBERRY SMOOTHIE POWERUP
 // ============================================================
 export function spawnSmoothie() {
-  const x = PLATFORM_X + 40 + Math.random() * (PLATFORM_W - 80);
+  const x = PLATFORM_X + 40 + random() * (PLATFORM_W - 80);
   S.smoothie = {
     x,
     y: -SMOOTHIE_SIZE,
-    vy: 50 + Math.random() * 40,
-    bobTimer: Math.random() * Math.PI * 2,
+    vy: 50 + random() * 40,
+    bobTimer: random() * Math.PI * 2,
     landed: false,
     landY: 0
   };
@@ -142,7 +143,7 @@ export function updateSmoothie(dt) {
     S.smoothieSpawnTimer -= dt;
     if (S.smoothieSpawnTimer <= 0 && (enemies.length > 0 || (boss && !boss.dying))) {
       const luck = S.gear.totalBuffs ? S.gear.totalBuffs.dropLuck : 0;
-      S.smoothieSpawnTimer = (20 + Math.random() * 10) * (1 - luck);
+      S.smoothieSpawnTimer = (20 + random() * 10) * (1 - luck);
       spawnSmoothie();
     }
     return;
@@ -227,12 +228,12 @@ export function drawSmoothie() {
 // WINGS POWERUP
 // ============================================================
 export function spawnWings() {
-  const x = PLATFORM_X + 40 + Math.random() * (PLATFORM_W - 80);
+  const x = PLATFORM_X + 40 + random() * (PLATFORM_W - 80);
   S.wingsItem = {
     x,
     y: -WINGS_SIZE,
-    vy: 50 + Math.random() * 40,
-    bobTimer: Math.random() * Math.PI * 2,
+    vy: 50 + random() * 40,
+    bobTimer: random() * Math.PI * 2,
     landed: false,
     landY: 0
   };
@@ -245,7 +246,7 @@ export function updateWings(dt) {
     S.wingsSpawnTimer -= dt;
     if (S.wingsSpawnTimer <= 0 && (enemies.length > 0 || (boss && !boss.dying))) {
       const luck = S.gear.totalBuffs ? S.gear.totalBuffs.dropLuck : 0;
-      S.wingsSpawnTimer = (25 + Math.random() * 15) * (1 - luck);
+      S.wingsSpawnTimer = (25 + random() * 15) * (1 - luck);
       spawnWings();
     }
     return;
@@ -326,12 +327,12 @@ export function drawWings() {
 // CHESTPLATE POWERUP + DWYER ALLY
 // ============================================================
 export function spawnChestplate() {
-  const x = PLATFORM_X + 40 + Math.random() * (PLATFORM_W - 80);
+  const x = PLATFORM_X + 40 + random() * (PLATFORM_W - 80);
   S.chestplateItem = {
     x,
     y: -CHESTPLATE_SIZE,
-    vy: 55 + Math.random() * 40,
-    bobTimer: Math.random() * Math.PI * 2,
+    vy: 55 + random() * 40,
+    bobTimer: random() * Math.PI * 2,
     landed: false,
     landY: 0
   };
@@ -344,8 +345,8 @@ export function updateChestplate(dt) {
     S.chestplateSpawnTimer -= dt;
     if (S.chestplateSpawnTimer <= 0 && round >= 4 && !S.dwyer && !S.chris && !S.beerCanItem && (enemies.length > 0 || (boss && !boss.dying))) {
       const luck = S.gear.totalBuffs ? S.gear.totalBuffs.dropLuck : 0;
-      S.chestplateSpawnTimer = (30 + Math.random() * 15) * (1 - luck);
-      if (Math.random() < 0.5) {
+      S.chestplateSpawnTimer = (30 + random() * 15) * (1 - luck);
+      if (random() < 0.5) {
         spawnChestplate();
       } else {
         spawnBeerCan();
@@ -376,8 +377,7 @@ export function updateChestplate(dt) {
     const pcy = player.y + PLAYER_H / 2;
     spawnParticles(pcx, pcy, '#ddaa44', 12, 120, 0.4);
     addShake(3, 0.1);
-    dwyerClip.currentTime = 0;
-    dwyerClip.play().catch(() => {});
+    playClip(dwyerClip);
     playSound('roundStart');
   }
 }
@@ -416,7 +416,7 @@ export function drawChestplate() {
 export function createDwyer() {
   const { player } = S;
   // Pick a landing X near center of platform (avoid edges)
-  const landX = PLATFORM_X + 60 + Math.random() * (PLATFORM_W - 120);
+  const landX = PLATFORM_X + 60 + random() * (PLATFORM_W - 120);
   return {
     x: landX,
     y: -DWYER_H - 60,   // start way above screen
@@ -455,14 +455,14 @@ function dwyerLandingAOE() {
   // Ground dust ring
   for (let i = 0; i < 20; i++) {
     const angle = (i / 20) * Math.PI * 2;
-    const speed = 150 + Math.random() * 200;
+    const speed = 150 + random() * 200;
     particles.push({
       x: cx, y: cy,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed * 0.4 - 60,
       life: 0.7, maxLife: 0.7,
-      color: Math.random() < 0.5 ? '#ddaa44' : '#aa7733',
-      size: 3 + Math.random() * 4
+      color: random() < 0.5 ? '#ddaa44' : '#aa7733',
+      size: 3 + random() * 4
     });
   }
 
@@ -519,13 +519,13 @@ export function updateDwyer(dt) {
       d.entryTrailTimer = 0.02;
       const cx = d.x + d.w / 2;
       particles.push({
-        x: cx + (Math.random() - 0.5) * 20,
+        x: cx + (random() - 0.5) * 20,
         y: d.y + d.h,
-        vx: (Math.random() - 0.5) * 40,
-        vy: -80 - Math.random() * 60,
+        vx: (random() - 0.5) * 40,
+        vy: -80 - random() * 60,
         life: 0.35, maxLife: 0.35,
-        color: Math.random() < 0.5 ? '#ffdd44' : '#ff6633',
-        size: 3 + Math.random() * 3
+        color: random() < 0.5 ? '#ffdd44' : '#ff6633',
+        size: 3 + random() * 3
       });
     }
 
@@ -676,7 +676,7 @@ export function drawDwyer() {
     for (let i = -2; i <= 2; i++) {
       ctx.beginPath();
       ctx.moveTo(cx + i * 12, dy - 5);
-      ctx.lineTo(cx + i * 12, dy - 40 - Math.random() * 30);
+      ctx.lineTo(cx + i * 12, dy - 40 - random() * 30);
       ctx.stroke();
     }
     ctx.restore();
@@ -780,12 +780,12 @@ export function drawDwyer() {
 // BEER CAN PICKUP + EAGER CHRIS ALLY
 // ============================================================
 export function spawnBeerCan() {
-  const x = PLATFORM_X + 40 + Math.random() * (PLATFORM_W - 80);
+  const x = PLATFORM_X + 40 + random() * (PLATFORM_W - 80);
   S.beerCanItem = {
     x,
     y: -BEER_CAN_SIZE,
-    vy: 55 + Math.random() * 40,
-    bobTimer: Math.random() * Math.PI * 2,
+    vy: 55 + random() * 40,
+    bobTimer: random() * Math.PI * 2,
     landed: false,
     landY: 0
   };
@@ -865,8 +865,8 @@ export function createChris() {
   const startX = fromLeft ? -CHRIS_W : W;
   // Target: charge about 2/3 across the platform
   const targetX = fromLeft
-    ? PLATFORM_X + PLATFORM_W * 0.37 + Math.random() * (PLATFORM_W * 0.17)
-    : PLATFORM_X + PLATFORM_W * 0.47 + Math.random() * (PLATFORM_W * 0.17);
+    ? PLATFORM_X + PLATFORM_W * 0.37 + random() * (PLATFORM_W * 0.17)
+    : PLATFORM_X + PLATFORM_W * 0.47 + random() * (PLATFORM_W * 0.17);
 
   return {
     x: startX,
@@ -926,13 +926,13 @@ export function updateChris(dt) {
       c.entryTrailTimer = 0.03;
       const trailX = c.facingRight ? c.x : c.x + c.w;
       particles.push({
-        x: trailX + (Math.random() - 0.5) * 10,
+        x: trailX + (random() - 0.5) * 10,
         y: c.y + c.h - 5,
-        vx: (c.facingRight ? -1 : 1) * (40 + Math.random() * 30),
-        vy: -20 - Math.random() * 30,
+        vx: (c.facingRight ? -1 : 1) * (40 + random() * 30),
+        vy: -20 - random() * 30,
         life: 0.3, maxLife: 0.3,
-        color: Math.random() < 0.5 ? '#aa8855' : '#ccaa77',
-        size: 2 + Math.random() * 3
+        color: random() < 0.5 ? '#aa8855' : '#ccaa77',
+        size: 2 + random() * 3
       });
     }
 
@@ -1085,7 +1085,7 @@ function throwCrushedCan(chris) {
     vx,
     vy,
     spin: 0,
-    spinSpeed: (Math.random() - 0.5) * 20,
+    spinSpeed: (random() - 0.5) * 20,
     alive: true,
   });
 }
@@ -1235,7 +1235,7 @@ export function drawChris() {
     for (let i = -1; i <= 1; i++) {
       ctx.beginPath();
       ctx.moveTo(baseX, dy + c.h - 10 + i * 8);
-      ctx.lineTo(baseX + (c.facingRight ? -30 : 30) - Math.random() * 15, dy + c.h - 10 + i * 8);
+      ctx.lineTo(baseX + (c.facingRight ? -30 : 30) - random() * 15, dy + c.h - 10 + i * 8);
       ctx.stroke();
     }
     ctx.restore();

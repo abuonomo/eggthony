@@ -2,6 +2,7 @@ import {
   W, H, PLATFORM_Y, PLAYER_W, PLAYER_H, PLAYER_MAX_HP,
   METAL_DURATION, MUSCLE_DURATION, WINGS_DURATION,
 } from './constants.js';
+import { random } from './rng.js';
 
 // ============================================================
 // SHARED MUTABLE STATE
@@ -10,6 +11,10 @@ export const S = {
   // Canvas (set in main.js)
   canvas: null,
   ctx: null,
+
+  // Headless / RL
+  headless: false,
+  tickCount: 0,
 
   // Game state
   gameState: 'title',
@@ -33,7 +38,7 @@ export const S = {
   devTapTimer: 0,
   devSpawnPowerup: '',
   devPowerupDrop: false,
-  devLeaderboard: localStorage.getItem('eggthonyDevLB') === 'true',
+  devLeaderboard: typeof localStorage !== 'undefined' && localStorage.getItem('eggthonyDevLB') === 'true',
 
   // Leaderboard
   leaderboardDesktop: [],
@@ -117,11 +122,11 @@ export const S = {
   metalHat: null,
   hatSpawnTimer: 0,
   smoothie: null,
-  smoothieSpawnTimer: 20 + Math.random() * 10,
+  smoothieSpawnTimer: 20 + random() * 10,
   wingsItem: null,
-  wingsSpawnTimer: 25 + Math.random() * 15,
+  wingsSpawnTimer: 25 + random() * 15,
   chestplateItem: null,
-  chestplateSpawnTimer: 30 + Math.random() * 15,
+  chestplateSpawnTimer: 30 + random() * 15,
   dwyer: null,
   chris: null,
   beerCanItem: null,
@@ -186,6 +191,7 @@ export function resetPlayer() {
 
 // Consolidated game reset — replaces the 3 duplicate reset blocks
 export function resetGameState(r) {
+  S.tickCount = 0;
   S.score = 0;
   S.round = r;
   S.enemies = [];
@@ -194,14 +200,14 @@ export function resetGameState(r) {
   S.particles = [];
   S.damageNumbers = [];
   S.metalHat = null;
-  S.hatSpawnTimer = 15 + Math.random() * 10;
+  S.hatSpawnTimer = 15 + random() * 10;
   S.smoothie = null;
-  S.smoothieSpawnTimer = 20 + Math.random() * 10;
+  S.smoothieSpawnTimer = 20 + random() * 10;
   S.wingsItem = null;
-  S.wingsSpawnTimer = 25 + Math.random() * 15;
+  S.wingsSpawnTimer = 25 + random() * 15;
   S.poopBombs = [];
   S.chestplateItem = null;
-  S.chestplateSpawnTimer = 30 + Math.random() * 15;
+  S.chestplateSpawnTimer = 30 + random() * 15;
   S.dwyer = null;
   S.chris = null;
   S.beerCanItem = null;

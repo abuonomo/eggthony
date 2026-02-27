@@ -5,7 +5,8 @@ import {
   FART_CLOUD_RADIUS, FART_CLOUD_DURATION, FART_CLOUD_DPS, FART_CLOUD_TICK,
   SNOT_STORM_DURATION,
 } from './constants.js';
-import { playSound, playNoise, playVoice, quentinFartClip } from './audio.js';
+import { random } from './rng.js';
+import { playSound, playNoise, playVoice, playClip, quentinFartClip } from './audio.js';
 import {
   evilSprite, evilSpriteLoaded, evilSprite2, evilSprite2Loaded,
   quentinPizzaSprite, quentinPizzaSpriteLoaded,
@@ -217,13 +218,13 @@ export function updateBoss(dt) {
       boss.attackCooldown -= dt;
       if (boss.attackCooldown <= 0) {
         // QP: chance to fart instead of normal attack
-        if (boss.isQuentinPizza && boss.fartCooldown <= 0 && Math.random() < 0.35) {
+        if (boss.isQuentinPizza && boss.fartCooldown <= 0 && random() < 0.35) {
           boss.state = 'fart_windup';
           boss.fartTimer = 0.8;
           boss.vx = 0;
         } else {
           const dist = Math.abs(pcx - bcx);
-          if (dist < 250 && Math.random() < 0.5) {
+          if (dist < 250 && random() < 0.5) {
             boss.state = 'charge_windup';
             boss.chargeTimer = 0.5;
             boss.chargeDir = Math.sign(pcx - bcx) || 1;
@@ -329,7 +330,7 @@ export function updateBoss(dt) {
             spawnDamageNumber(pcx, player.y, boss.damage, '#ff4444');
             addShake(6, 0.15);
             playSound('hurt');
-            if (Math.random() < 0.3) playVoice('bad');
+            if (random() < 0.3) playVoice('bad');
           }
         }
       }
@@ -368,9 +369,7 @@ export function updateBoss(dt) {
           tickTimer: 0,
           expandTimer: 0.5
         });
-        // Play fart sound
-        quentinFartClip.currentTime = 0;
-        quentinFartClip.play().catch(() => {});
+        playClip(quentinFartClip);
         // Green particles
         spawnParticles(boss.x + boss.w / 2, PLATFORM_Y - 20, '#66cc22', 20, 180, 0.5);
         spawnParticles(boss.x + boss.w / 2, PLATFORM_Y - 20, '#88ff44', 10, 120, 0.4);
@@ -423,7 +422,7 @@ export function updateBoss(dt) {
         spawnDamageNumber(pcx, player.y, boss.damage, '#ff4444');
         addShake(6, 0.15);
         playSound('hurt');
-        if (Math.random() < 0.3) playVoice('bad');
+        if (random() < 0.3) playVoice('bad');
       }
     }
   }
@@ -710,17 +709,17 @@ export function updateFartClouds(dt) {
       }
     }
     // Ambient particles
-    if (Math.random() < 0.3) {
-      const angle = Math.random() * Math.PI * 2;
-      const r = Math.random() * c.radius * 0.8;
+    if (random() < 0.3) {
+      const angle = random() * Math.PI * 2;
+      const r = random() * c.radius * 0.8;
       S.particles.push({
         x: c.x + Math.cos(angle) * r,
-        y: c.y + Math.sin(angle) * r - Math.random() * 20,
-        vx: (Math.random() - 0.5) * 30,
-        vy: -Math.random() * 40 - 10,
+        y: c.y + Math.sin(angle) * r - random() * 20,
+        vx: (random() - 0.5) * 30,
+        vy: -random() * 40 - 10,
         life: 0.5, maxLife: 0.5,
-        color: Math.random() < 0.5 ? '#66aa22' : '#88cc44',
-        size: Math.random() * 3 + 1
+        color: random() < 0.5 ? '#66aa22' : '#88cc44',
+        size: random() * 3 + 1
       });
     }
     if (c.timer <= 0) {
