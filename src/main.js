@@ -76,6 +76,8 @@ setupMouse(canvas);
 setupTouch(canvas);
 initNameOverlay();
 fetchLeaderboard();
+initAmbientParticles();
+initBgDetails();
 
 // ============================================================
 // CLICK HANDLER (state transitions)
