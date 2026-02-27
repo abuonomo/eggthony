@@ -43,7 +43,8 @@ export function updateMetalHat(dt) {
     // Spawn chance: once every ~20s on average, only during combat
     S.hatSpawnTimer -= dt;
     if (S.hatSpawnTimer <= 0 && (enemies.length > 0 || (boss && !boss.dying))) {
-      S.hatSpawnTimer = 15 + Math.random() * 10;
+      const luck = S.gear.totalBuffs ? S.gear.totalBuffs.dropLuck : 0;
+      S.hatSpawnTimer = (15 + Math.random() * 10) * (1 - luck);
       spawnMetalHat();
     }
     return;
@@ -132,7 +133,8 @@ export function updateSmoothie(dt) {
   if (!S.smoothie) {
     S.smoothieSpawnTimer -= dt;
     if (S.smoothieSpawnTimer <= 0 && (enemies.length > 0 || (boss && !boss.dying))) {
-      S.smoothieSpawnTimer = 20 + Math.random() * 10;
+      const luck = S.gear.totalBuffs ? S.gear.totalBuffs.dropLuck : 0;
+      S.smoothieSpawnTimer = (20 + Math.random() * 10) * (1 - luck);
       spawnSmoothie();
     }
     return;
@@ -234,7 +236,8 @@ export function updateWings(dt) {
   if (!S.wingsItem) {
     S.wingsSpawnTimer -= dt;
     if (S.wingsSpawnTimer <= 0 && (enemies.length > 0 || (boss && !boss.dying))) {
-      S.wingsSpawnTimer = 25 + Math.random() * 15;
+      const luck = S.gear.totalBuffs ? S.gear.totalBuffs.dropLuck : 0;
+      S.wingsSpawnTimer = (25 + Math.random() * 15) * (1 - luck);
       spawnWings();
     }
     return;
@@ -332,7 +335,8 @@ export function updateChestplate(dt) {
   if (!S.chestplateItem) {
     S.chestplateSpawnTimer -= dt;
     if (S.chestplateSpawnTimer <= 0 && round >= 4 && !S.dwyer && (enemies.length > 0 || (boss && !boss.dying))) {
-      S.chestplateSpawnTimer = 30 + Math.random() * 15;
+      const luck = S.gear.totalBuffs ? S.gear.totalBuffs.dropLuck : 0;
+      S.chestplateSpawnTimer = (30 + Math.random() * 15) * (1 - luck);
       spawnChestplate();
     }
     return;

@@ -107,7 +107,7 @@
     "dropWeight": 40,
     "minRound": 1,
     "buffs": {
-      "scoreMult": 1.1
+      "dropLuck": 0.1
     },
     "sprite": "data/gear/star_pin.png",
     "anchors": {

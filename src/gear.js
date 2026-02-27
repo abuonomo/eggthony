@@ -118,7 +118,7 @@ export function unequipSlot(slot) {
 // BUFF CALCULATION
 // ============================================================
 export function recalcBuffs() {
-  const buffs = { maxHp: 0, speed: 0, jumpForce: 0, damage: 0, scoreMult: 1.0 };
+  const buffs = { maxHp: 0, speed: 0, jumpForce: 0, damage: 0, dropLuck: 0 };
   for (const slot of GEAR_SLOTS) {
     const itemId = S.gear.equipped[slot];
     if (!itemId) continue;
@@ -129,7 +129,7 @@ export function recalcBuffs() {
     if (b.speed) buffs.speed += b.speed;
     if (b.jumpForce) buffs.jumpForce += b.jumpForce;
     if (b.damage) buffs.damage += b.damage;
-    if (b.scoreMult) buffs.scoreMult *= b.scoreMult;
+    if (b.dropLuck) buffs.dropLuck += b.dropLuck;
   }
   S.gear.totalBuffs = buffs;
 }
@@ -325,7 +325,7 @@ export function drawEquipScreen() {
   if (b.speed) buffParts.push(`+${b.speed} SPD`);
   if (b.jumpForce) buffParts.push(`+${Math.abs(b.jumpForce)} JMP`);
   if (b.damage) buffParts.push(`+${b.damage} DMG`);
-  if (b.scoreMult && b.scoreMult !== 1) buffParts.push(`x${b.scoreMult.toFixed(1)} SCORE`);
+  if (b.dropLuck) buffParts.push(`+${Math.round(b.dropLuck * 100)}% DROPS`);
   ctx.fillText(buffParts.length > 0 ? buffParts.join('  ') : 'No buffs equipped', W / 2, buffY);
 
   // Inventory grid (filtered to selected slot)
@@ -530,7 +530,7 @@ export function drawGearDrop() {
   if (item.buffs.speed) buffTexts.push(`+${item.buffs.speed} Speed`);
   if (item.buffs.jumpForce) buffTexts.push(`+${Math.abs(item.buffs.jumpForce)} Jump`);
   if (item.buffs.damage) buffTexts.push(`+${item.buffs.damage} Damage`);
-  if (item.buffs.scoreMult) buffTexts.push(`x${item.buffs.scoreMult} Score`);
+  if (item.buffs.dropLuck) buffTexts.push(`+${Math.round(item.buffs.dropLuck * 100)}% Drops`);
   ctx.fillText(buffTexts.join('  '), W / 2, H / 2 + 90);
 
   // Continue prompt
