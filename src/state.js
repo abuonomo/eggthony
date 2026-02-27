@@ -122,7 +122,7 @@ export const S = {
   dwyer: null,
 
   // Gear system
-  gear: { version: 1, inventory: [], equipped: { head: null, body: null, collar: null, accessory: null }, totalBuffs: { maxHp: 0, speed: 0, jumpForce: 0, damage: 0, scoreMult: 1.0 } },
+  gear: { version: 1, inventory: [], equipped: { head: null, body: null, collar: null, accessory: null }, totalBuffs: { maxHp: 0, speed: 0, jumpForce: 0, damage: 0, dropLuck: 0 } },
   gearSelectedSlot: 'head',
   gearReturnState: 'title',
   gearDropItem: null,

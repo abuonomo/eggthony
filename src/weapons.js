@@ -556,7 +556,7 @@ function poopAOEDamage(cx, cy) {
         e.dying = true;
         e.deathTimer = 0.4;
         const stormScore = e.type === 'brute' ? 30 : e.type === 'spitter' ? 20 : 10;
-        S.score += Math.round(stormScore * (S.gear.totalBuffs ? S.gear.totalBuffs.scoreMult : 1));
+        S.score += stormScore;
       }
     }
   }

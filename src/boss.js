@@ -90,7 +90,7 @@ export function updateBoss(dt) {
   if (boss.dying) {
     boss.deathTimer -= dt;
     if (boss.deathTimer <= 0) {
-      S.score += Math.round(boss.scoreValue * (S.gear.totalBuffs ? S.gear.totalBuffs.scoreMult : 1));
+      S.score += boss.scoreValue;
       spawnDamageNumber(boss.x + boss.w / 2, boss.y, boss.scoreValue, '#ffdd00');
       S.bossDefeated = true;
       S.bossActive = false;
