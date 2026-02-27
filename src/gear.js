@@ -138,8 +138,10 @@ export function recalcBuffs() {
 // DROP SYSTEM
 // ============================================================
 export function rollDrop(round) {
-  // Drop probability: 20% at round 1, +10% per round, max 80%
-  const prob = Math.min(0.8, 0.2 + (round - 1) * 0.1);
+  // No gear drops until after the first boss (round 4+)
+  if (round < 4) return null;
+  // Drop probability: 30% at round 4, +10% per round after, max 80%
+  const prob = Math.min(0.8, 0.3 + (round - 4) * 0.1);
   if (Math.random() > prob) return null;
 
   // Build weighted pool filtered by minRound
