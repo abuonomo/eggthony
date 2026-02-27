@@ -80,6 +80,7 @@ export const S = {
     poopCooldown: 0,
     stompChain: 0,
     snotStormTimer: 0,
+    knockbackTimer: 0,
   },
 
   // Boss
@@ -173,6 +174,7 @@ export function resetPlayer() {
   player.poopCooldown = 0;
   player.stompChain = 0;
   player.snotStormTimer = 0;
+  player.knockbackTimer = 0;
   S.lowHpTriggered = false;
   S.snotStormFlash = 0;
 }

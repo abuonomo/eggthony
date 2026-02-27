@@ -312,7 +312,7 @@ export function updateBoss(dt) {
         const shockDist = Math.abs(pcx - (boss.x + boss.w / 2));
         if (shockDist < 120 && player.iframes <= 0 && player.wingsTimer <= 0) {
           if (player.metalTimer > 0) {
-            const knockDir = Math.sign(pcx - (boss.x + boss.w / 2));
+            const knockDir = Math.sign(pcx - (boss.x + boss.w / 2)) || 1;
             player.vx = knockDir * 400;
             player.vy = -300;
             spawnParticles(pcx, pcy, '#aaccff', 6, 120, 0.3);
@@ -323,6 +323,7 @@ export function updateBoss(dt) {
             player.iframes = IFRAME_DURATION;
             player.vx = knockDir * 400;
             player.vy = -250;
+            player.knockbackTimer = 0.3;
             player.airJumps = 1; // reset air jump so player can escape knockback
             player.flashTimer = 0.15;
             spawnDamageNumber(pcx, player.y, boss.damage, '#ff4444');
@@ -405,17 +406,18 @@ export function updateBoss(dt) {
   if (boss.state !== 'entering' && !boss.dying && player.iframes <= 0) {
     if (rectsOverlap(player.x, player.y, PLAYER_W, PLAYER_H, boss.x, boss.y, boss.w, boss.h)) {
       if (player.metalTimer > 0) {
-        const knockDir = Math.sign(boss.x + boss.w / 2 - pcx);
+        const knockDir = Math.sign(boss.x + boss.w / 2 - pcx) || 1;
         damageBoss(40, knockDir * 100, -50);
         spawnParticles(pcx, pcy, '#aaccff', 6, 120, 0.3);
         playSound('hit');
         player.iframes = 0.2;
       } else {
-        const knockDir = Math.sign(pcx - (boss.x + boss.w / 2));
+        const knockDir = Math.sign(pcx - (boss.x + boss.w / 2)) || 1;
         player.hp -= boss.damage;
         player.iframes = IFRAME_DURATION;
         player.vx = knockDir * CONTACT_KNOCKBACK;
-        player.vy = -200;
+        player.vy = -380;
+        player.knockbackTimer = 0.3;
         player.airJumps = 1; // reset air jump so player can escape knockback
         player.flashTimer = 0.15;
         spawnDamageNumber(pcx, player.y, boss.damage, '#ff4444');

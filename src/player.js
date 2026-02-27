@@ -50,7 +50,12 @@ export function updatePlayer(dt) {
   if (keys['a'] || keys['arrowleft']) moveX -= 1;
   if (keys['d'] || keys['arrowright']) moveX += 1;
   const gearSpeed = S.gear.totalBuffs ? S.gear.totalBuffs.speed : 0;
-  player.vx = moveX * (PLAYER_SPEED + gearSpeed);
+  
+  if (player.knockbackTimer > 0) {
+    player.knockbackTimer -= dt;
+  } else {
+    player.vx = moveX * (PLAYER_SPEED + gearSpeed);
+  }
 
   if (player.spiderDropTimer > 0) {
     // Spider Drop mode — hang from ceiling, 3x fire rate
@@ -103,7 +108,8 @@ export function updatePlayer(dt) {
     const holdingDown = keys['s'] || keys['arrowdown'];
     const fastFall = holdingDown && !player.onGround && player.vy > 0;
     if (fastFall) player.iframes = Math.max(player.iframes, 0.1); // Rolling iframes during dive
-    player.vy += GRAVITY * (fastFall ? 1.8 : 1.0) * dt;
+    const knockbackFloaty = player.knockbackTimer > 0 ? 0.35 : 1.0;
+    player.vy += GRAVITY * (fastFall ? 1.8 : knockbackFloaty) * dt;
 
     // Apply velocity
     player.x += player.vx * dt;

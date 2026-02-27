@@ -246,18 +246,19 @@ export function updateEnemies(dt) {
       if (rectsOverlap(player.x, player.y, PLAYER_W, PLAYER_H, e.x, e.y, e.w, e.h)) {
         if (player.metalTimer > 0) {
           // Metal mode: bounce enemies away instead
-          const knockDir = Math.sign(e.x + e.w / 2 - (player.x + PLAYER_W / 2));
+          const knockDir = Math.sign(e.x + e.w / 2 - (player.x + PLAYER_W / 2)) || 1;
           e.vx = knockDir * 400;
           e.vy = -250;
           damageEnemy(i, 40, knockDir * 400, -250);
           spawnParticles(player.x + PLAYER_W / 2, player.y + PLAYER_H / 2, '#aaccff', 6, 120, 0.3);
           playSound('hit');
         } else {
-          const knockDir = Math.sign(player.x + PLAYER_W / 2 - (e.x + e.w / 2));
+          const knockDir = Math.sign(player.x + PLAYER_W / 2 - (e.x + e.w / 2)) || 1;
           player.hp -= e.damage;
           player.iframes = IFRAME_DURATION;
           player.vx = knockDir * CONTACT_KNOCKBACK;
-          player.vy = -200;
+          player.vy = -380;
+          player.knockbackTimer = 0.3;
           player.airJumps = 1; // reset air jump so player can escape knockback
           player.flashTimer = 0.15;
           spawnDamageNumber(player.x + PLAYER_W / 2, player.y, e.damage, '#ff4444');
