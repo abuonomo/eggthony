@@ -177,7 +177,8 @@ export function awardDrop(itemId) {
 // ============================================================
 // GET CURRENT SPRITE VARIANT KEY
 // ============================================================
-function getSpriteVariant() {
+function getSpriteVariant(variantOverride = null) {
+  if (variantOverride) return variantOverride;
   const { player } = S;
   if (player.metalTimer > 0) return 'metal';
   if (player.muscleTimer > 0) return 'muscle';
@@ -190,9 +191,9 @@ function getSpriteVariant() {
 // ============================================================
 // Called inside drawPlayer()'s inner ctx.save/restore (facing flip already applied).
 // drawX, drawY, drawW, drawH are the player sprite's actual draw rect.
-export function drawGearOnPlayer(drawX, drawY, drawW, drawH) {
+export function drawGearOnPlayer(drawX, drawY, drawW, drawH, options = {}) {
   const ctx = S.ctx;
-  const variant = getSpriteVariant();
+  const variant = getSpriteVariant(options.variant || null);
   const pcx = drawX + drawW / 2;  // Player center X
   const topY = drawY;             // Player top Y
   const scale = drawH / PLAYER_H; // Scale factor for non-standard sizes (title screen, equip preview)
@@ -313,7 +314,8 @@ export function drawEquipScreen() {
     const pX = previewX + previewW / 2 - pW / 2;
     const pY = previewY + previewH / 2 - pH / 2 + 20;
     ctx.drawImage(eggSprite, pX, pY, pW, pH);
-    drawGearOnPlayer(pX, pY, pW, pH);
+    // Keep preview anchors stable regardless of temporary in-run powerup timers.
+    drawGearOnPlayer(pX, pY, pW, pH, { variant: 'default' });
   }
 
   // Buff summary
