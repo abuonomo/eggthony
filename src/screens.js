@@ -102,11 +102,14 @@ function drawLeaderboardTable({ topY, maxRows, rowStep, rowFont, highlightEntry,
   const rows = (data || []).slice(0, maxRows);
   if (rows.length <= 0) return topY;
 
-  // Keep columns compact and centered as a single block beneath the section title.
+  // Scale layout to font size — larger rows get more horizontal room.
+  ctx.font = rowFont;
+  const charW = ctx.measureText('M').width;
+  const large = charW > 7;
   const rankW = 24;
-  const nameMaxW = 128;
-  const nameToScoreGap = 22;
-  const scoreToRoundGap = 52;
+  const nameMaxW = large ? 150 : 110;
+  const nameToScoreGap = large ? 60 : 50;
+  const scoreToRoundGap = large ? 60 : 52;
   const blockWidth = rankW + nameMaxW + nameToScoreGap + scoreToRoundGap;
   const rankX = Math.floor(W / 2 - blockWidth / 2);
   const nameX = rankX + rankW;
@@ -129,12 +132,12 @@ function drawLeaderboardTable({ topY, maxRows, rowStep, rowFont, highlightEntry,
     const rowY = topY + 14 + i * rowStep;
     const isHighlight = highlightEntry ? highlightEntry(e) : false;
     const rankText = `${i + 1}.`;
-    const nameText = fitLeaderboardText(ctx, e.name, nameMaxW);
     const scoreText = formatLeaderboardNumber(e.score);
     const roundText = `R${e.round || 0}`;
 
     ctx.fillStyle = isHighlight ? '#ffcc00' : '#ccc';
     ctx.font = rowFont;
+    const nameText = fitLeaderboardText(ctx, e.name, nameMaxW);
     ctx.textAlign = 'left';
     ctx.fillText(rankText, rankX, rowY);
     ctx.fillText(nameText, nameX, rowY);
