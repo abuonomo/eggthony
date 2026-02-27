@@ -36,7 +36,8 @@ export const S = {
   devLeaderboard: localStorage.getItem('eggthonyDevLB') === 'true',
 
   // Leaderboard
-  leaderboardData: [],
+  leaderboardDesktop: [],
+  leaderboardMobile: [],
   leaderboardInputActive: false,
 
   // Input

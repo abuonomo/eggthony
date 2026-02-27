@@ -20,14 +20,25 @@ import { GEAR_ITEMS, awardDrop, recalcBuffs, saveGear, drawGearOnPlayer } from '
 // ============================================================
 // LEADERBOARD
 // ============================================================
+const platform = isMobile ? 'mobile' : 'desktop';
+const otherPlat = platform === 'desktop' ? 'mobile' : 'desktop';
+function ownPlatformData() { return platform === 'desktop' ? S.leaderboardDesktop : S.leaderboardMobile; }
+function otherPlatformData() { return platform === 'desktop' ? S.leaderboardMobile : S.leaderboardDesktop; }
+function otherPlatformName() { return otherPlat.toUpperCase(); }
+
 export async function fetchLeaderboard() {
   if (S.devLeaderboard) {
-    S.leaderboardData = getDevScores();
+    S.leaderboardDesktop = getDevScores('desktop');
+    S.leaderboardMobile = getDevScores('mobile');
     return;
   }
   try {
-    const res = await fetch(LEADERBOARD_API + '/scores');
-    if (res.ok) S.leaderboardData = await res.json();
+    const [dRes, mRes] = await Promise.all([
+      fetch(LEADERBOARD_API + '/scores?platform=desktop'),
+      fetch(LEADERBOARD_API + '/scores?platform=mobile'),
+    ]);
+    if (dRes.ok) S.leaderboardDesktop = await dRes.json();
+    if (mRes.ok) S.leaderboardMobile = await mRes.json();
   } catch {}
 }
 
@@ -38,26 +49,38 @@ async function submitScore(name, score, round) {
     scores.sort((a, b) => b.score - a.score);
     scores.length = Math.min(scores.length, 20);
     saveDevScores(scores);
-    S.leaderboardData = scores;
+    // Refresh both arrays
+    S.leaderboardDesktop = getDevScores('desktop');
+    S.leaderboardMobile = getDevScores('mobile');
     return;
   }
   try {
     const res = await fetch(LEADERBOARD_API + '/scores', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, score, round }),
+      body: JSON.stringify({ name, score, round, platform }),
     });
-    if (res.ok) S.leaderboardData = await res.json();
+    if (res.ok) {
+      const updated = await res.json();
+      if (platform === 'desktop') S.leaderboardDesktop = updated;
+      else S.leaderboardMobile = updated;
+    }
   } catch {}
 }
 
-export function getDevScores() {
-  try { return JSON.parse(localStorage.getItem('eggthonyDevScores') || '[]'); }
+export function getDevScores(plat = platform) {
+  // One-time migration from old key
+  const old = localStorage.getItem('eggthonyDevScores');
+  if (old !== null) {
+    localStorage.setItem('eggthonyDevScores:desktop', old);
+    localStorage.removeItem('eggthonyDevScores');
+  }
+  try { return JSON.parse(localStorage.getItem(`eggthonyDevScores:${plat}`) || '[]'); }
   catch { return []; }
 }
 
-export function saveDevScores(scores) {
-  localStorage.setItem('eggthonyDevScores', JSON.stringify(scores));
+export function saveDevScores(scores, plat = platform) {
+  localStorage.setItem(`eggthonyDevScores:${plat}`, JSON.stringify(scores));
 }
 
 function formatLeaderboardNumber(value) {
@@ -74,10 +97,10 @@ function fitLeaderboardText(ctx, text, maxWidth) {
   return clipped ? `${clipped}..` : '';
 }
 
-function drawLeaderboardTable({ topY, maxRows, rowStep, rowFont, highlightEntry }) {
+function drawLeaderboardTable({ topY, maxRows, rowStep, rowFont, highlightEntry, data }) {
   const ctx = S.ctx;
-  const rows = S.leaderboardData.slice(0, maxRows);
-  if (rows.length <= 0) return;
+  const rows = (data || []).slice(0, maxRows);
+  if (rows.length <= 0) return topY;
 
   // Keep columns compact and centered as a single block beneath the section title.
   const rankW = 24;
@@ -100,6 +123,7 @@ function drawLeaderboardTable({ topY, maxRows, rowStep, rowFont, highlightEntry 
   ctx.fillText('SCORE', scoreX, topY);
   ctx.fillText('ROUND', roundX, topY);
 
+  let bottomY = topY;
   for (let i = 0; i < rows.length; i++) {
     const e = rows[i];
     const rowY = topY + 14 + i * rowStep;
@@ -117,8 +141,10 @@ function drawLeaderboardTable({ topY, maxRows, rowStep, rowFont, highlightEntry 
     ctx.textAlign = 'right';
     ctx.fillText(scoreText, scoreX, rowY);
     ctx.fillText(roundText, roundX, rowY);
+    bottomY = rowY;
   }
   ctx.restore();
+  return bottomY;
 }
 
 // ============================================================
@@ -161,10 +187,11 @@ async function handleNameSubmit() {
   await submitScore(name, S.score, S.round);
   await fetchLeaderboard();
   const savedName = localStorage.getItem('eggthonyName') || '';
-  const isChampion = S.leaderboardData.length > 0 &&
-    S.leaderboardData[0].name === savedName &&
-    S.leaderboardData[0].score === S.score &&
-    S.leaderboardData[0].round === S.round;
+  const ownData = ownPlatformData();
+  const isChampion = ownData.length > 0 &&
+    ownData[0].name === savedName &&
+    ownData[0].score === S.score &&
+    ownData[0].round === S.round;
   if (isChampion) {
     S.crownAnimActive = true;
     S.crownAnimTimer = 0;
@@ -523,13 +550,26 @@ export function drawTitleScreen() {
     ctx.fillText(line, W / 2, ctrlY + i * 24);
   });
 
-  // Top scores on title
-  if (S.leaderboardData.length > 0) {
-    const lbY = ctrlY + controls.length * 24 + 20;
-    ctx.fillStyle = '#ffcc00';
-    ctx.font = 'bold 14px monospace';
-    ctx.fillText(S.devLeaderboard ? 'TOP SCORES (DEV)' : 'TOP SCORES', W / 2, lbY);
-    drawLeaderboardTable({ topY: lbY + 18, maxRows: 5, rowStep: 16, rowFont: '12px monospace' });
+  // Top scores on title — desktop first, then mobile
+  if (S.leaderboardDesktop.length > 0 || S.leaderboardMobile.length > 0) {
+    let lbY = ctrlY + controls.length * 24 + 20;
+    const isOwn = platform === 'desktop';
+    if (S.leaderboardDesktop.length > 0) {
+      ctx.fillStyle = '#ffcc00';
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center';
+      const dLabel = S.devLeaderboard ? 'TOP SCORES · DESKTOP (DEV)' : 'TOP SCORES · DESKTOP';
+      ctx.fillText(dLabel, W / 2, lbY);
+      lbY = drawLeaderboardTable({ topY: lbY + 18, maxRows: 3, rowStep: 16, rowFont: '12px monospace', data: S.leaderboardDesktop }) + 26;
+    }
+    if (S.leaderboardMobile.length > 0) {
+      ctx.fillStyle = '#ffcc00';
+      ctx.font = 'bold 14px monospace';
+      ctx.textAlign = 'center';
+      const mLabel = S.devLeaderboard ? 'TOP SCORES · MOBILE (DEV)' : 'TOP SCORES · MOBILE';
+      ctx.fillText(mLabel, W / 2, lbY);
+      drawLeaderboardTable({ topY: lbY + 18, maxRows: 3, rowStep: 16, rowFont: '12px monospace', data: S.leaderboardMobile });
+    }
   }
 
   // GEAR button (only show if player has gear)
@@ -696,7 +736,7 @@ function drawDevMenu(ctx) {
 
     ctx.fillStyle = '#666';
     ctx.font = '11px monospace';
-    ctx.fillText(getDevScores().length + ' local scores', W / 2, dlY + 135);
+    ctx.fillText(getDevScores('desktop').length + ' desktop / ' + getDevScores('mobile').length + ' mobile scores', W / 2, dlY + 135);
   }
 
   // Dev gear controls
@@ -734,6 +774,17 @@ function drawDevMenu(ctx) {
   ctx.fillStyle = '#666';
   ctx.font = '11px monospace';
   ctx.fillText(S.gear.inventory.length + ' items in inventory', W / 2, gY + 54);
+
+  // Jump to game over button
+  const goY = gY + 68;
+  ctx.fillStyle = '#442222';
+  ctx.fillRect(dlX, goY, 260, 36);
+  ctx.strokeStyle = '#ff4444';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(dlX, goY, 260, 36);
+  ctx.fillStyle = '#ff6644';
+  ctx.font = 'bold 13px monospace';
+  ctx.fillText('JUMP TO GAME OVER', W / 2, goY + 22);
 }
 
 export function handleDevMenuClick(cx, cy) {
@@ -821,7 +872,7 @@ export function handleDevMenuClick(cx, cy) {
   }
   if (S.devLeaderboard) {
     if (cx >= dlX && cx <= dlX + 120 && cy >= dlY + 46 && cy <= dlY + 78) {
-      const fakes = [
+      const desktopFakes = [
         { name: 'ZapMaster', score: 4200, round: 12 },
         { name: 'EggLord', score: 3800, round: 11 },
         { name: 'StormyBoi', score: 3100, round: 9 },
@@ -831,16 +882,31 @@ export function handleDevMenuClick(cx, cy) {
         { name: 'ShellShock', score: 900, round: 4 },
         { name: 'Noob123', score: 350, round: 2 },
       ];
-      const scores = getDevScores().concat(fakes);
-      scores.sort((a, b) => b.score - a.score);
-      scores.length = Math.min(scores.length, 20);
-      saveDevScores(scores);
-      S.leaderboardData = scores;
+      const mobileFakes = [
+        { name: 'TapKing', score: 3900, round: 11 },
+        { name: 'SwipeGod', score: 3200, round: 10 },
+        { name: 'ThumbWar', score: 2700, round: 8 },
+        { name: 'PhoneFry', score: 2000, round: 7 },
+        { name: 'PinchZap', score: 1400, round: 5 },
+        { name: 'MobNoob', score: 600, round: 3 },
+      ];
+      const dScores = getDevScores('desktop').concat(desktopFakes);
+      dScores.sort((a, b) => b.score - a.score);
+      dScores.length = Math.min(dScores.length, 20);
+      saveDevScores(dScores, 'desktop');
+      const mScores = getDevScores('mobile').concat(mobileFakes);
+      mScores.sort((a, b) => b.score - a.score);
+      mScores.length = Math.min(mScores.length, 20);
+      saveDevScores(mScores, 'mobile');
+      S.leaderboardDesktop = dScores;
+      S.leaderboardMobile = mScores;
       return true;
     }
     if (cx >= dlX + 140 && cx <= dlX + 260 && cy >= dlY + 46 && cy <= dlY + 78) {
-      saveDevScores([]);
-      S.leaderboardData = [];
+      saveDevScores([], 'desktop');
+      saveDevScores([], 'mobile');
+      S.leaderboardDesktop = [];
+      S.leaderboardMobile = [];
       return true;
     }
     if (cx >= dlX && cx <= dlX + 260 && cy >= dlY + 88 && cy <= dlY + 120) {
@@ -849,7 +915,9 @@ export function handleDevMenuClick(cx, cy) {
         { name: 'AlsoEasy', score: 50, round: 1 },
       ];
       saveDevScores(low);
-      S.leaderboardData = low;
+      // Only own platform — refresh both arrays from storage
+      S.leaderboardDesktop = getDevScores('desktop');
+      S.leaderboardMobile = getDevScores('mobile');
       return true;
     }
   }
@@ -875,6 +943,19 @@ export function handleDevMenuClick(cx, cy) {
     }
     recalcBuffs();
     saveGear();
+    return true;
+  }
+
+  // Jump to game over
+  const goBtnY = gY + 68;
+  if (cx >= dlX && cx <= dlX + 260 && cy >= goBtnY && cy <= goBtnY + 36) {
+    S.devMenuOpen = false;
+    S.score = 1337;
+    S.round = 7;
+    S.gameState = 'gameOver';
+    S.gameOverCooldown = 0;
+    S.gameOverPhase = 'showing';
+    fetchLeaderboard();
     return true;
   }
 
@@ -1037,20 +1118,35 @@ export function drawGameOver() {
   ctx.font = '20px monospace';
   ctx.fillText(`Reached Round ${S.round}`, W / 2, H / 2 + 40);
 
-  if (S.gameOverPhase === 'showing' && S.leaderboardData.length > 0) {
-    const startY = H / 2 + 80;
-    ctx.fillStyle = '#ffcc00';
-    ctx.font = 'bold 18px monospace';
-    ctx.fillText(S.devLeaderboard ? 'TOP SCORES (DEV)' : 'TOP SCORES', W / 2, startY);
-
-    const savedName = localStorage.getItem('eggthonyName') || '';
-    drawLeaderboardTable({
-      topY: startY + 22,
-      maxRows: 10,
-      rowStep: 18,
-      rowFont: '14px monospace',
-      highlightEntry: e => e.name === savedName && e.score === S.score && e.round === S.round,
-    });
+  if (S.gameOverPhase === 'showing') {
+    if (S.leaderboardDesktop.length > 0 || S.leaderboardMobile.length > 0) {
+      let goY = H / 2 + 80;
+      const savedName = localStorage.getItem('eggthonyName') || '';
+      const hlFn = e => e.name === savedName && e.score === S.score && e.round === S.round;
+      const isOwn = platform === 'desktop';
+      if (S.leaderboardDesktop.length > 0) {
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = 'bold 18px monospace';
+        ctx.textAlign = 'center';
+        const dLabel = S.devLeaderboard ? 'TOP SCORES · DESKTOP (DEV)' : 'TOP SCORES · DESKTOP';
+        ctx.fillText(dLabel, W / 2, goY);
+        goY = drawLeaderboardTable({
+          topY: goY + 22, maxRows: 5, rowStep: 18, rowFont: '14px monospace',
+          highlightEntry: isOwn ? hlFn : null, data: S.leaderboardDesktop,
+        }) + 30;
+      }
+      if (S.leaderboardMobile.length > 0) {
+        ctx.fillStyle = '#ffcc00';
+        ctx.font = 'bold 18px monospace';
+        ctx.textAlign = 'center';
+        const mLabel = S.devLeaderboard ? 'TOP SCORES · MOBILE (DEV)' : 'TOP SCORES · MOBILE';
+        ctx.fillText(mLabel, W / 2, goY);
+        drawLeaderboardTable({
+          topY: goY + 22, maxRows: 5, rowStep: 18, rowFont: '14px monospace',
+          highlightEntry: !isOwn ? hlFn : null, data: S.leaderboardMobile,
+        });
+      }
+    }
   }
 
   if (S.gameOverPhase === 'showing') {
