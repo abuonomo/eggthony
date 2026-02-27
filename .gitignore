@@ -6,11 +6,17 @@ dist/
 wheels/
 *.egg-info
 
+# Environment variables
+.env
+
 # Virtual environments
 .venv
 
 # Node
 node_modules/
+
+# Vite
+.vite/
 
 # Claude Code
 .claude/

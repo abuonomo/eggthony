@@ -5,5 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.9.4"
 dependencies = [
+    "openai>=1.82.0",
     "pillow>=11.3.0",
+    "python-dotenv>=1.1.0",
 ]
