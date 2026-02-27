@@ -5,6 +5,7 @@ Eggthony: Lightning Egg — HTML5 Canvas arena brawler built with ES6 modules an
 
 ## Architecture
 - **Build:** Vite dev server + production bundler (`npm run dev` / `npm run build`)
+- **CRITICAL PRE-COMMIT CHECK:** You MUST run `npm run build` before declaring a task complete or committing to main. The Vite dev server masks case-sensitivity and asset-pathing errors that will break the Linux-based GitHub Actions deployment. If `npm run build` fails, you must fix the errors before proceeding.
 - **Resolution:** 480x854 (portrait), fixed 60 FPS timestep via accumulator
 - **Rendering:** Canvas 2D with pixelated upscaling
 - **Audio:** Web Audio API procedural SFX (`playSound()` switch) + M4A voice clips in `public/data/sounds/`
