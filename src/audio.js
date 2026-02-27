@@ -9,7 +9,7 @@ export function ensureAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
   if (!audioUnlocked) {
     audioUnlocked = true;
-    for (const clip of [...Object.values(voiceClips), snotSniffleClip, snotLaunchClip, quentinFartClip, dwyerClip]) {
+    for (const clip of [...Object.values(voiceClips), snotSniffleClip, snotLaunchClip, quentinFartClip, dwyerClip, gulpClip, throwClip]) {
       clip.load();
     }
   }
@@ -188,6 +188,32 @@ export function playSound(type) {
       gain.gain.exponentialRampToValueAtTime(0.001, t + 0.5);
       osc.start(t); osc.stop(t + 0.5);
       break;
+    case 'beerGulp':
+      // Use real gulp sound clip
+      gulpClip.currentTime = 0;
+      gulpClip.play().catch(() => {});
+      osc.start(t); osc.stop(t + 0.01);
+      gain.gain.setValueAtTime(0, t);
+      break;
+    case 'beerThrow':
+      // Use real whoosh sound clip
+      throwClip.currentTime = 0;
+      throwClip.play().catch(() => {});
+      osc.start(t); osc.stop(t + 0.01);
+      gain.gain.setValueAtTime(0, t);
+      break;
+    case 'beerSplash': {
+      // Wet crunchy splat
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(300, t);
+      osc.frequency.exponentialRampToValueAtTime(60, t + 0.2);
+      gain.gain.setValueAtTime(0.22, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+      osc.start(t); osc.stop(t + 0.25);
+      // Splash noise layer
+      playNoise(0.15, 0.15);
+      break;
+    }
     // 'powerup' reuses roundStart
     case 'powerup':
       osc.type = 'sine';
@@ -227,7 +253,8 @@ export const voiceClips = {
   lose: new Audio(encodeURI('data/sounds/Lose - eh maybe next time.m4a')),
   win: new Audio(encodeURI('data/sounds/Win \u2014 let\u2019s freaking go boys.m4a')),
   start: new Audio(encodeURI('data/sounds/Start game trimmed.m4a')),
-  boss: new Audio(encodeURI('data/sounds/Boss_eat_trimmed.m4a'))
+  boss: new Audio(encodeURI('data/sounds/Boss_eat_trimmed.m4a')),
+  chris: new Audio(encodeURI('data/sounds/eager_chris.m4a'))
 };
 export const snotSniffleClip = new Audio(encodeURI('data/sounds/Snot rocket sniffle.m4a'));
 snotSniffleClip.preload = 'auto';
@@ -238,6 +265,10 @@ export const quentinFartClip = new Audio(encodeURI('data/sounds/quentin_fart_tri
 quentinFartClip.preload = 'auto';
 export const dwyerClip = new Audio(encodeURI('data/sounds/dwyer.m4a'));
 dwyerClip.preload = 'auto';
+export const gulpClip = new Audio('data/sounds/freesound_community-gulp-37759.mp3');
+gulpClip.preload = 'auto';
+export const throwClip = new Audio('data/sounds/denielcz-bamboo-whoosh-429156.mp3');
+throwClip.preload = 'auto';
 export const musicClip = new Audio(encodeURI('data/sounds/music.m4a'));
 musicClip.preload = 'auto';
 musicClip.loop = true;

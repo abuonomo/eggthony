@@ -3,7 +3,7 @@ import {
   W, H, PLATFORM_Y, PLAYER_W, PLAYER_H, PLAYER_MAX_HP,
   METAL_DURATION, MUSCLE_DURATION, WINGS_DURATION,
   SNOT_COOLDOWN, SNOT_MAX_CHARGE, SNOT_STORM_DURATION,
-  DWYER_DURATION, CROWN_ANIM_DURATION, THEMES,
+  DWYER_DURATION, CHRIS_DURATION, CROWN_ANIM_DURATION, THEMES,
   LEADERBOARD_API,
 } from './constants.js';
 import { ensureAudio, playSound, playVoice, musicClip } from './audio.js';
@@ -11,6 +11,8 @@ import { eggSprite, spriteLoaded } from './sprites.js';
 import { spawnParticles, drawParticles } from './effects.js';
 import { isMobile } from './input.js';
 import { isBossRound, bossAppearance } from './boss.js';
+import { spawnMetalHat, spawnSmoothie, spawnWings, spawnChestplate,
+         createDwyer, spawnBeerCan, createChris } from './powerups.js';
 import { getThemeIndex, initAmbientParticles, initBgDetails } from './world.js';
 import { startRound } from './waves.js';
 import { GEAR_ITEMS, awardDrop, recalcBuffs, saveGear, drawGearOnPlayer } from './gear.js';
@@ -313,6 +315,30 @@ export function drawHUD() {
     ctx.fillText('DWYER', W / 2, dby + 10);
   }
 
+  // Chris ally indicator
+  if (S.chris && !S.chris.entering) {
+    const cBarW = 100;
+    const cBarH = 10;
+    const cbx = W / 2 - cBarW / 2;
+    let cby = 50;
+    if (player.metalTimer > 0) cby += 14;
+    if (player.muscleTimer > 0) cby += 14;
+    if (player.wingsTimer > 0) cby += 14;
+    if (S.dwyer) cby += 14;
+    const cRatio = S.chris.timer / CHRIS_DURATION;
+    ctx.fillStyle = '#332200';
+    ctx.fillRect(cbx, cby, cBarW, cBarH);
+    ctx.fillStyle = cRatio < 0.3 ? '#886633' : '#dd8822';
+    ctx.fillRect(cbx, cby, cBarW * cRatio, cBarH);
+    ctx.strokeStyle = '#dd8822';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cbx, cby, cBarW, cBarH);
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillStyle = '#ffcc88';
+    ctx.fillText('CHRIS', W / 2, cby + 10);
+  }
+
   // Snot Storm mode indicator
   if (player.snotStormTimer > 0) {
     const ssBarW = 100;
@@ -323,6 +349,7 @@ export function drawHUD() {
     if (player.muscleTimer > 0) ssby += 14;
     if (player.wingsTimer > 0) ssby += 14;
     if (S.dwyer) ssby += 14;
+    if (S.chris && !S.chris.entering) ssby += 14;
     const ssRatio = player.snotStormTimer / SNOT_STORM_DURATION;
     let barVisible = true;
     if (ssRatio < 0.3) {
@@ -588,10 +615,10 @@ function drawDevMenu(ctx) {
   const pwY = startY + rows * (btnH + gap) + 72;
   ctx.fillStyle = '#888';
   ctx.font = '11px monospace';
-  ctx.fillText('START WITH POWERUP:', W / 2, pwY);
-  const pwNames = ['NONE', 'METAL', 'MUSCLE', 'WINGS'];
-  const pwKeys = ['', 'metal', 'muscle', 'wings'];
-  const pwColors = ['#666', '#aaccff', '#cc66ff', '#ffdd88'];
+  ctx.fillText(S.devPowerupDrop ? 'DROP POWERUP ITEM:' : 'START WITH POWERUP:', W / 2, pwY);
+  const pwNames = ['NONE', 'METAL', 'MUSCLE', 'WINGS', 'DWYER', 'CHRIS'];
+  const pwKeys = ['', 'metal', 'muscle', 'wings', 'dwyer', 'chris'];
+  const pwColors = ['#666', '#aaccff', '#cc66ff', '#ffdd88', '#ddaa44', '#dd8822'];
   const pwBtnW = 60, pwGap = 6;
   const pwTotalW = pwNames.length * pwBtnW + (pwNames.length - 1) * pwGap;
   const pwStartX = (W - pwTotalW) / 2;
@@ -609,8 +636,26 @@ function drawDevMenu(ctx) {
     ctx.fillText(pwNames[i], bx + pwBtnW / 2, by + 17);
   }
 
+  // Instant / Drop toggle
+  const togY = pwY + 40;
+  const togW = 80, togGap = 8;
+  const togStartX = W / 2 - togW - togGap / 2;
+  for (let i = 0; i < 2; i++) {
+    const bx = togStartX + i * (togW + togGap);
+    const isActive = i === 0 ? !S.devPowerupDrop : S.devPowerupDrop;
+    const label = i === 0 ? 'INSTANT' : 'DROP';
+    ctx.fillStyle = isActive ? '#223344' : '#222';
+    ctx.fillRect(bx, togY, togW, 22);
+    ctx.strokeStyle = isActive ? '#88bbff' : '#444';
+    ctx.lineWidth = isActive ? 2 : 1;
+    ctx.strokeRect(bx, togY, togW, 22);
+    ctx.fillStyle = isActive ? '#aaddff' : '#666';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillText(label, bx + togW / 2, togY + 15);
+  }
+
   // Dev leaderboard controls
-  const dlY = startY + rows * (btnH + gap) + 116;
+  const dlY = startY + rows * (btnH + gap) + 146;
   const dlX = W / 2 - 130;
   ctx.fillStyle = S.devLeaderboard ? '#224422' : '#333';
   ctx.fillRect(dlX, dlY, 260, 36);
@@ -712,9 +757,23 @@ export function handleDevMenuClick(cx, cy) {
         S.currentThemeIndex = getThemeIndex(r);
         initAmbientParticles();
         initBgDetails();
-        if (S.devSpawnPowerup === 'metal') S.player.metalTimer = METAL_DURATION;
-        if (S.devSpawnPowerup === 'muscle') S.player.muscleTimer = MUSCLE_DURATION;
-        if (S.devSpawnPowerup === 'wings') S.player.wingsTimer = WINGS_DURATION;
+        if (S.devSpawnPowerup) {
+          if (S.devPowerupDrop) {
+            // Drop the pickup item immediately
+            if (S.devSpawnPowerup === 'metal') spawnMetalHat();
+            if (S.devSpawnPowerup === 'muscle') spawnSmoothie();
+            if (S.devSpawnPowerup === 'wings') spawnWings();
+            if (S.devSpawnPowerup === 'dwyer') spawnChestplate();
+            if (S.devSpawnPowerup === 'chris') spawnBeerCan();
+          } else {
+            // Apply instantly
+            if (S.devSpawnPowerup === 'metal') S.player.metalTimer = METAL_DURATION;
+            if (S.devSpawnPowerup === 'muscle') S.player.muscleTimer = MUSCLE_DURATION;
+            if (S.devSpawnPowerup === 'wings') S.player.wingsTimer = WINGS_DURATION;
+            if (S.devSpawnPowerup === 'dwyer') S.dwyer = createDwyer();
+            if (S.devSpawnPowerup === 'chris') S.chris = createChris();
+          }
+        }
         startRound(r);
         return true;
       }
@@ -728,20 +787,31 @@ export function handleDevMenuClick(cx, cy) {
   }
   // Dev powerup toggles
   const pwY = startY + rows * (btnH + gap) + 72;
-  const pwNames = ['', 'metal', 'muscle', 'wings'];
+  const pwKeys = ['', 'metal', 'muscle', 'wings', 'dwyer', 'chris'];
   const pwBtnW = 60, pwGap = 6;
-  const pwTotalW = 4 * pwBtnW + 3 * pwGap;
+  const pwTotalW = pwKeys.length * pwBtnW + (pwKeys.length - 1) * pwGap;
   const pwStartX = (W - pwTotalW) / 2;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < pwKeys.length; i++) {
     const bx = pwStartX + i * (pwBtnW + pwGap);
     const by = pwY + 8;
     if (cx >= bx && cx <= bx + pwBtnW && cy >= by && cy <= by + 26) {
-      S.devSpawnPowerup = pwNames[i];
+      S.devSpawnPowerup = pwKeys[i];
+      return true;
+    }
+  }
+  // Instant / Drop toggle
+  const togY = pwY + 40;
+  const togW = 80, togGap = 8;
+  const togStartX = W / 2 - togW - togGap / 2;
+  for (let i = 0; i < 2; i++) {
+    const bx = togStartX + i * (togW + togGap);
+    if (cx >= bx && cx <= bx + togW && cy >= togY && cy <= togY + 22) {
+      S.devPowerupDrop = i === 1;
       return true;
     }
   }
   // Dev leaderboard controls
-  const dlY = startY + rows * (btnH + gap) + 116;
+  const dlY = startY + rows * (btnH + gap) + 146;
   const dlX = W / 2 - 130;
   if (cx >= dlX && cx <= dlX + 260 && cy >= dlY && cy <= dlY + 36) {
     S.devLeaderboard = !S.devLeaderboard;
@@ -784,7 +854,7 @@ export function handleDevMenuClick(cx, cy) {
     }
   }
   // Dev gear controls
-  const dlYBase = startY + rows * (btnH + gap) + 116;
+  const dlYBase = startY + rows * (btnH + gap) + 146;
   const gY = S.devLeaderboard ? dlYBase + 155 : dlYBase + 50;
   const gBtnW = 120, gBtnH = 32, gGap = 10;
   const gStartX = W / 2 - gBtnW - gGap / 2;

@@ -71,6 +71,22 @@ export const DWYER_ATTACK_COOLDOWN = 0.6;
 export const DWYER_LANDING_AOE_RADIUS = 200;
 export const DWYER_LANDING_DAMAGE = 35;
 
+// Eager Chris ally
+export const CHRIS_DURATION = 12;
+export const BEER_CAN_SIZE = 56;
+export const CHRIS_W = 80, CHRIS_H = 120;
+export const CHRIS_SPEED = 270;
+export const CHRIS_THROW_RANGE = 260;
+export const CHRIS_THROW_DAMAGE = 28;
+export const CHRIS_THROW_COOLDOWN = 0.7;
+export const CHRIS_CHUG_TIME = 0.35;
+export const CHRIS_SPLASH_RADIUS = 80;
+export const CHRIS_SPLASH_DAMAGE = 18;
+export const CHRIS_CAN_SPEED = 380;
+export const CHRIS_CAN_GRAVITY = 260;
+export const CHRIS_ENTRY_SPEED = 500;
+export const CHRIS_CHARGE_DAMAGE = 30;
+
 // Snot Storm
 export const SNOT_STORM_DURATION = 8.0;
 export const SNOT_STORM_AOE = 80;

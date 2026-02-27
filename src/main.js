@@ -23,7 +23,10 @@ import { updateMetalHat, drawMetalHat,
          updateSmoothie, drawSmoothie,
          updateWings, drawWings,
          updateChestplate, drawChestplate,
-         updateDwyer, drawDwyer } from './powerups.js';
+         updateDwyer, drawDwyer,
+         updateBeerCan, drawBeerCan,
+         updateChris, drawChris,
+         updateChrisCans, drawChrisCans } from './powerups.js';
 import { getThemeIndex, initAmbientParticles, initBgDetails,
          updateAmbientParticles, drawBackground,
          drawPlatform, drawFloatingPlatforms,
@@ -279,6 +282,9 @@ function update(dt) {
     updatePoopBombs(dt);
     updateChestplate(dt);
     updateDwyer(dt);
+    updateBeerCan(dt);
+    updateChris(dt);
+    updateChrisCans(dt);
     updateCampSpider(dt);
     updateWaves(dt);
     updateFloatingPlatforms(dt);
@@ -287,6 +293,8 @@ function update(dt) {
     if (S.player.hp <= 0) {
       musicClip.pause();
       S.dwyer = null;
+      S.chris = null;
+      S.chrisCans = [];
       S.campSpider = null;
       S.campTimer = 0;
       spawnParticles(S.player.x + PLAYER_W / 2, S.player.y + PLAYER_H / 2, '#f5e6c8', 30, 300, 1.0);
@@ -362,6 +370,8 @@ function draw() {
     drawChestplate();
     drawEnemies();
     drawDwyer();
+    drawChris();
+    drawBeerCan();
     drawBoss();
     drawFartClouds();
     drawPlayer();
@@ -369,6 +379,7 @@ function draw() {
     drawLightningBolts();
     drawSnotRocket();
     drawPoopBombs();
+    drawChrisCans();
     drawCampSpider();
     drawParticles();
     drawDamageNumbers();

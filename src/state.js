@@ -32,6 +32,7 @@ export const S = {
   devTapCount: 0,
   devTapTimer: 0,
   devSpawnPowerup: '',
+  devPowerupDrop: false,
   devLeaderboard: localStorage.getItem('eggthonyDevLB') === 'true',
 
   // Leaderboard
@@ -121,6 +122,9 @@ export const S = {
   chestplateItem: null,
   chestplateSpawnTimer: 30 + Math.random() * 15,
   dwyer: null,
+  chris: null,
+  beerCanItem: null,
+  chrisCans: [],
 
   // Gear system
   gear: { version: 1, inventory: [], equipped: { head: null, body: null, collar: null, accessory: null }, totalBuffs: { maxHp: 0, speed: 0, jumpForce: 0, damage: 0, dropLuck: 0 } },
@@ -198,6 +202,9 @@ export function resetGameState(r) {
   S.chestplateItem = null;
   S.chestplateSpawnTimer = 30 + Math.random() * 15;
   S.dwyer = null;
+  S.chris = null;
+  S.beerCanItem = null;
+  S.chrisCans = [];
   S.campSpider = null;
   S.campTimer = 0;
   S.boss = null;

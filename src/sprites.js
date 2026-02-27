@@ -64,6 +64,48 @@ function removeWhiteBG(img, callback) {
   out.src = c2.toDataURL();
 }
 
+function removeDarkBG(img, callback) {
+  const c = document.createElement('canvas');
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  c.width = w;
+  c.height = h;
+  const cx = c.getContext('2d');
+  cx.drawImage(img, 0, 0);
+  const id = cx.getImageData(0, 0, w, h);
+  const d = id.data;
+  // Strip neutral grey background — tight tolerance to preserve dark hair, jeans, outlines
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2];
+    if (r < 160 && g < 160 && b < 160 &&
+        Math.abs(r - g) < 15 && Math.abs(g - b) < 15 && Math.abs(r - b) < 15) {
+      d[i + 3] = 0;
+    }
+  }
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (d[(y * w + x) * 4 + 3] > 0) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  const cropW = maxX - minX + 1;
+  const cropH = maxY - minY + 1;
+  cx.putImageData(id, 0, 0);
+  const cropped = cx.getImageData(minX, minY, cropW, cropH);
+  const c2 = document.createElement('canvas');
+  c2.width = cropW;
+  c2.height = cropH;
+  c2.getContext('2d').putImageData(cropped, 0, 0);
+  const out = new Image();
+  out.onload = () => callback(out);
+  out.src = c2.toDataURL();
+}
+
 // Reusable offscreen canvas for sprite flash effects
 export const flashCanvas = document.createElement('canvas');
 export const flashCtx = flashCanvas.getContext('2d');
@@ -80,6 +122,7 @@ export let swordSprite = null, swordSpriteLoaded = false;
 export let quentinPizzaSprite = null, quentinPizzaSpriteLoaded = false;
 export let snotCageSprite = null, snotCageSpriteLoaded = false;
 export let spiderSprite = null, spiderSpriteLoaded = false;
+export let beerCanSprite = null, beerCanSpriteLoaded = false;
 
 const spriteFiles = [
   ['data/grunt.png',           (s) => { gruntSprite = s; gruntSpriteLoaded = true; }],
@@ -93,6 +136,7 @@ const spriteFiles = [
   ['data/quentin_pizza.png',   (s) => { quentinPizzaSprite = s; quentinPizzaSpriteLoaded = true; }],
   ['data/snot_cage.png',       (s) => { snotCageSprite = s; snotCageSpriteLoaded = true; }],
   ['data/spider.png',          (s) => { spiderSprite = s; spiderSpriteLoaded = true; }],
+  ['data/beer_can.png',        (s) => { beerCanSprite = s; beerCanSpriteLoaded = true; }],
 ];
 for (const [src, cb] of spriteFiles) {
   const raw = new Image();
@@ -106,6 +150,56 @@ export let wingsSpriteLoaded = false;
   const raw = new Image();
   raw.onload = () => removeWhiteBG(raw, (s) => { wingsSprite = s; wingsSpriteLoaded = true; });
   raw.src = 'data/eggthony_wings.png';
+}
+
+export let chrisSprite = null, chrisSpriteLoaded = false;
+export let chrisDrinkingSprite = null, chrisDrinkingSpriteLoaded = false;
+export let crushedCanSprite = null, crushedCanSpriteLoaded = false;
+
+// Auto-crop to non-transparent bounding box (no color stripping)
+function autoCrop(img, callback) {
+  const c = document.createElement('canvas');
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  c.width = w;
+  c.height = h;
+  const cx = c.getContext('2d');
+  cx.drawImage(img, 0, 0);
+  const id = cx.getImageData(0, 0, w, h);
+  const d = id.data;
+  let minX = w, minY = h, maxX = 0, maxY = 0;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (d[(y * w + x) * 4 + 3] > 0) {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+  }
+  const cropW = maxX - minX + 1;
+  const cropH = maxY - minY + 1;
+  const cropped = cx.getImageData(minX, minY, cropW, cropH);
+  const c2 = document.createElement('canvas');
+  c2.width = cropW;
+  c2.height = cropH;
+  c2.getContext('2d').putImageData(cropped, 0, 0);
+  const out = new Image();
+  out.onload = () => callback(out);
+  out.src = c2.toDataURL();
+}
+
+// Chris sprites — already have transparent backgrounds, just auto-crop
+const preCroppedFiles = [
+  ['data/eager_chris_holding_can.png', (s) => { chrisSprite = s; chrisSpriteLoaded = true; }],
+  ['data/eager_chris_drinking.png',    (s) => { chrisDrinkingSprite = s; chrisDrinkingSpriteLoaded = true; }],
+  ['data/beer_can_crushed.png',        (s) => { crushedCanSprite = s; crushedCanSpriteLoaded = true; }],
+];
+for (const [src, cb] of preCroppedFiles) {
+  const raw = new Image();
+  raw.onload = () => autoCrop(raw, cb);
+  raw.src = src;
 }
 
 export let wingsPowerupSprite = null, wingsPowerupSpriteLoaded = false;
