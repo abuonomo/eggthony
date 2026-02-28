@@ -11,7 +11,7 @@ export function ensureAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
   if (!audioUnlocked) {
     audioUnlocked = true;
-    for (const clip of [...Object.values(voiceClips), snotSniffleClip, snotLaunchClip, quentinFartClip, dwyerClip, gulpClip, throwClip]) {
+    for (const clip of [...Object.values(voiceClips), snotSniffleClip, snotLaunchClip, quentinFartClip, dwyerClip, gulpClip, throwClip, melodicaClip]) {
       clip.load();
     }
   }
@@ -271,6 +271,8 @@ export const gulpClip = new Audio('data/sounds/freesound_community-gulp-37759.mp
 gulpClip.preload = 'auto';
 export const throwClip = new Audio('data/sounds/denielcz-bamboo-whoosh-429156.mp3');
 throwClip.preload = 'auto';
+export const melodicaClip = new Audio('data/sounds/freesound_community-melodica-one-note-88607.mp3');
+melodicaClip.preload = 'auto';
 export const musicClip = new Audio(encodeURI('data/sounds/music.m4a'));
 musicClip.preload = 'auto';
 musicClip.loop = true;

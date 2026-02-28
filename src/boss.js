@@ -6,10 +6,11 @@ import {
   SNOT_STORM_DURATION,
 } from './constants.js';
 import { random } from './rng.js';
-import { playSound, playNoise, playVoice, playClip, quentinFartClip } from './audio.js';
+import { playSound, playNoise, playVoice, playClip, quentinFartClip, melodicaClip } from './audio.js';
 import {
   evilSprite, evilSpriteLoaded, evilSprite2, evilSprite2Loaded,
   quentinPizzaSprite, quentinPizzaSpriteLoaded,
+  deanBossSprite, deanBossSpriteLoaded,
   snotCageSprite, snotCageSpriteLoaded,
   flashCanvas, flashCtx,
 } from './sprites.js';
@@ -17,7 +18,7 @@ import { spawnParticles, spawnDamageNumber, addShake } from './effects.js';
 import { rectsOverlap } from './utils.js';
 
 // ============================================================
-// BOSS SYSTEM — EVIL EGGTHONY / QUENTIN PIZZA
+// BOSS SYSTEM — EVIL EGGTHONY / QUENTIN PIZZA / DEAN
 // ============================================================
 
 export function isBossRound(r) {
@@ -31,11 +32,12 @@ export function bossAppearance(r) {
 export function createBoss(r) {
   const app = bossAppearance(r);
   const isQP = app >= 3;
+  const isDean = app === 2; // Level 6
   // QP resets scale: qpApp counts from 1 on first QP appearance
   const qpApp = isQP ? app - 2 : app;
-  const scale = isQP ? 1 + (qpApp - 1) * 0.15 : 1 + (app - 1) * 0.2;
-  const baseH = isQP ? 153 : 180;
-  const baseW = isQP ? 153 : Math.round(180 * (818 / 1164)); // QP is square, evil egg uses aspect ratio
+  const scale = isQP ? 1 + (qpApp - 1) * 0.15 : (isDean ? 1.5 : 1 + (app - 1) * 0.2);
+  const baseH = isQP ? 153 : (isDean ? 160 : 180);
+  const baseW = isQP ? 153 : (isDean ? 100 : Math.round(180 * (818 / 1164))); 
   const w = Math.round(baseW * scale);
   const h = Math.round(baseH * scale);
   const damage = isQP ? Math.min(30, 20 + (qpApp - 1) * 10) : 20 + (app - 1) * 10;
@@ -70,6 +72,7 @@ export function createBoss(r) {
     rage: false,
     animTimer: 0,
     isQuentinPizza: isQP,
+    isDean: isDean,
     fartCooldown: 0,
     fartTimer: 0,
     freezeTimer: 0
@@ -217,8 +220,12 @@ export function updateBoss(dt) {
 
       boss.attackCooldown -= dt;
       if (boss.attackCooldown <= 0) {
-        // QP: chance to fart instead of normal attack
-        if (boss.isQuentinPizza && boss.fartCooldown <= 0 && random() < 0.35) {
+        // Dean: chance to sonic boom
+        if (boss.isDean && Math.random() < 0.4) {
+          boss.state = 'sonic_boom_windup';
+          boss.chargeTimer = 0.8;
+          boss.vx = 0;
+        } else if (boss.isQuentinPizza && boss.fartCooldown <= 0 && random() < 0.35) {
           boss.state = 'fart_windup';
           boss.fartTimer = 0.8;
           boss.vx = 0;
@@ -236,6 +243,43 @@ export function updateBoss(dt) {
             boss.poundTargetX = pcx;
           }
         }
+      }
+      break;
+    }
+
+    case 'sonic_boom_windup': {
+      boss.chargeTimer -= dt;
+      boss.vx = 0;
+      if (boss.chargeTimer <= 0) {
+        boss.state = 'sonic_boom_release';
+        boss.chargeTimer = 0.5;
+        playClip(melodicaClip);
+        
+        // Spawn sonic boom projectile/shockwave
+        const dir = boss.facingRight ? 1 : -1;
+        S.enemyProjectiles.push({
+          x: boss.facingRight ? boss.x + boss.w : boss.x,
+          y: boss.y + boss.h / 2,
+          vx: dir * 700, // fast
+          vy: 0,
+          damage: 25,
+          life: 2,
+          color: '#00ffff',
+          radius: 40, // big projectile
+          isSonicBoom: true,
+          knockbackX: dir * 800,
+          knockbackY: -400
+        });
+        addShake(10, 0.3);
+      }
+      break;
+    }
+    case 'sonic_boom_release': {
+      boss.chargeTimer -= dt;
+      boss.vx = 0;
+      if (boss.chargeTimer <= 0) {
+        boss.state = 'idle';
+        boss.attackCooldown = 2.0 * cooldownMult;
       }
       break;
     }
@@ -544,13 +588,16 @@ export function drawBoss() {
     return;
   }
 
-  // Aura (green for QP, red for evil eggthony)
+  // Aura (green for QP, red for evil eggthony, cyan for Dean)
   const auraSize = boss.rage ? 1.4 : 1.15;
   const auraAlpha = boss.rage ? (0.25 + 0.15 * Math.sin(performance.now() * 0.01)) : 0.1;
   const auraGrad = ctx.createRadialGradient(bcx, bcy, boss.w * 0.3, bcx, bcy, boss.w * auraSize);
   if (boss.isQuentinPizza) {
     auraGrad.addColorStop(0, `rgba(80,200,20,${auraAlpha})`);
     auraGrad.addColorStop(1, 'rgba(80,200,20,0)');
+  } else if (boss.isDean) {
+    auraGrad.addColorStop(0, `rgba(0,255,255,${auraAlpha})`);
+    auraGrad.addColorStop(1, 'rgba(0,255,255,0)');
   } else {
     auraGrad.addColorStop(0, `rgba(255,0,0,${auraAlpha})`);
     auraGrad.addColorStop(1, 'rgba(255,0,0,0)');
@@ -580,11 +627,23 @@ export function drawBoss() {
     }
   }
 
-  // Draw sprite — QP -> quentinPizzaSprite, app>=2 -> evilSprite2, else evilSprite
+  // Sonic Boom telegraph
+  if (boss.state === 'sonic_boom_windup') {
+    const boomAlpha = 0.5 + 0.5 * Math.sin(performance.now() * 0.03);
+    ctx.fillStyle = `rgba(0,255,255,${boomAlpha})`;
+    ctx.beginPath();
+    const boomX = boss.facingRight ? boss.x + boss.w : boss.x;
+    ctx.arc(boomX, bcy, 20 + Math.sin(performance.now() * 0.05) * 10, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Draw sprite
   const useQP = boss.isQuentinPizza && quentinPizzaSpriteLoaded;
-  const useSprite2 = !useQP && boss.appearance >= 2 && evilSprite2Loaded;
-  const bossSprite = useQP ? quentinPizzaSprite : (useSprite2 ? evilSprite2 : evilSprite);
-  if (useQP || useSprite2 || evilSpriteLoaded) {
+  const useDean = boss.isDean && deanBossSpriteLoaded;
+  const useSprite2 = !useQP && !useDean && boss.appearance >= 2 && evilSprite2Loaded;
+  const bossSprite = useQP ? quentinPizzaSprite : (useDean ? deanBossSprite : (useSprite2 ? evilSprite2 : evilSprite));
+  
+  if (useQP || useDean || useSprite2 || evilSpriteLoaded) {
     ctx.save();
     if (!boss.facingRight) {
       ctx.translate(bcx, bcy);
@@ -603,7 +662,7 @@ export function drawBoss() {
     if (boss.rage) {
       ctx.globalCompositeOperation = 'source-atop';
       const tint = 0.15 + 0.1 * Math.sin(performance.now() * 0.008);
-      ctx.fillStyle = boss.isQuentinPizza ? `rgba(80,200,20,${tint})` : `rgba(255,0,0,${tint})`;
+      ctx.fillStyle = boss.isQuentinPizza ? `rgba(80,200,20,${tint})` : (boss.isDean ? `rgba(0,255,255,${tint})` : `rgba(255,0,0,${tint})`);
       ctx.fillRect(boss.x, boss.y, boss.w, boss.h);
     }
 
@@ -619,8 +678,6 @@ export function drawBoss() {
     ctx.fillRect(bcx + eyeOff - eyeSize * 1.5, bcy - boss.h * 0.15, eyeSize, eyeSize);
     ctx.fillRect(bcx + eyeOff + eyeSize * 0.5, bcy - boss.h * 0.15, eyeSize, eyeSize);
   }
-
-  // (Freeze visual now handled by snot cage early return above)
 
   // Shockwave ring
   if (boss.shockwaveActive) {
@@ -671,7 +728,7 @@ export function drawBossHPBar() {
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 11px monospace';
   ctx.textAlign = 'left';
-  ctx.fillText(boss.isQuentinPizza ? 'QUENTIN PIZZA' : 'EVIL EGGTHONY', barX + 6, barY + 13);
+  ctx.fillText(boss.isQuentinPizza ? 'QUENTIN PIZZA' : (boss.isDean ? 'DEAN' : 'EVIL EGGTHONY'), barX + 6, barY + 13);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = '#ffcc44';
