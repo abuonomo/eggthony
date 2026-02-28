@@ -614,6 +614,14 @@ export function drawTitleScreen() {
 // ============================================================
 // DEV MENU
 // ============================================================
+const DEV_MENU_MAX_ROUND = 24;
+const DEV_MENU_COLS = 6;
+const DEV_MENU_BTN_W = 70;
+const DEV_MENU_BTN_H = 50;
+const DEV_MENU_GAP = 10;
+const DEV_MENU_CLOSE_SIZE = 32;
+const DEV_MENU_CLOSE_MARGIN = 14;
+
 function drawDevMenu(ctx) {
   ctx.fillStyle = 'rgba(0,0,0,0.85)';
   ctx.fillRect(0, 0, W, H);
@@ -621,50 +629,40 @@ function drawDevMenu(ctx) {
   ctx.fillStyle = '#ffcc00';
   ctx.font = 'bold 28px monospace';
   ctx.fillText('DEV MENU', W / 2, 60);
-  ctx.fillStyle = '#888';
-  ctx.font = '14px monospace';
-  ctx.fillText('Select round to start', W / 2, 85);
+  ctx.fillStyle = '#999';
+  ctx.font = '13px monospace';
+  ctx.fillText('Configure options, then pick a round', W / 2, 85);
 
-  const cols = 5, rows = 3;
-  const btnW = 70, btnH = 50, gap = 10;
-  const gridW = cols * btnW + (cols - 1) * gap;
-  const startX = (W - gridW) / 2;
-  const startY = 110;
-  for (let row = 0; row < rows; row++) {
-    for (let col = 0; col < cols; col++) {
-      const r = row * cols + col + 1;
-      const bx = startX + col * (btnW + gap);
-      const by = startY + row * (btnH + gap);
-      const isBoss = r >= 3 && r % 3 === 0;
-      const isQPRound = isBoss && bossAppearance(r) >= 3;
-      ctx.fillStyle = isQPRound ? '#224422' : (isBoss ? '#442222' : '#333');
-      ctx.fillRect(bx, by, btnW, btnH);
-      ctx.strokeStyle = isQPRound ? '#44ff44' : (isBoss ? '#ff4444' : '#666');
-      ctx.lineWidth = 2;
-      ctx.strokeRect(bx, by, btnW, btnH);
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 16px monospace';
-      ctx.fillText(`R${r}`, bx + btnW / 2, by + 22);
-      if (isBoss) {
-        ctx.fillStyle = isQPRound ? '#44ff44' : '#ff6644';
-        ctx.font = '10px monospace';
-        ctx.fillText(isQPRound ? 'QP' : 'BOSS', bx + btnW / 2, by + 40);
-      }
-    }
-  }
+  // Top-right close button
+  const closeX = W - DEV_MENU_CLOSE_SIZE - DEV_MENU_CLOSE_MARGIN;
+  const closeY = DEV_MENU_CLOSE_MARGIN;
+  ctx.fillStyle = '#331111';
+  ctx.fillRect(closeX, closeY, DEV_MENU_CLOSE_SIZE, DEV_MENU_CLOSE_SIZE);
+  ctx.strokeStyle = '#ff6666';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(closeX, closeY, DEV_MENU_CLOSE_SIZE, DEV_MENU_CLOSE_SIZE);
+  ctx.strokeStyle = '#ffaaaa';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(closeX + 8, closeY + 8);
+  ctx.lineTo(closeX + DEV_MENU_CLOSE_SIZE - 8, closeY + DEV_MENU_CLOSE_SIZE - 8);
+  ctx.moveTo(closeX + DEV_MENU_CLOSE_SIZE - 8, closeY + 8);
+  ctx.lineTo(closeX + 8, closeY + DEV_MENU_CLOSE_SIZE - 8);
+  ctx.stroke();
 
-  // Close button
-  ctx.fillStyle = '#444';
-  ctx.fillRect(W / 2 - 50, startY + rows * (btnH + gap) + 20, 100, 36);
-  ctx.strokeStyle = '#888';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(W / 2 - 50, startY + rows * (btnH + gap) + 20, 100, 36);
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 14px monospace';
-  ctx.fillText('CLOSE', W / 2, startY + rows * (btnH + gap) + 43);
+  const settingsTop = 108;
+  ctx.fillStyle = '#ffcc00';
+  ctx.font = 'bold 13px monospace';
+  ctx.fillText('SETTINGS', W / 2, settingsTop - 10);
+
+  const cols = DEV_MENU_COLS;
+  const rows = Math.ceil(DEV_MENU_MAX_ROUND / cols);
+  const btnW = DEV_MENU_BTN_W;
+  const btnH = DEV_MENU_BTN_H;
+  const gap = DEV_MENU_GAP;
 
   // Dev powerup toggles
-  const pwY = startY + rows * (btnH + gap) + 72;
+  const pwY = settingsTop;
   ctx.fillStyle = '#888';
   ctx.font = '11px monospace';
   ctx.fillText(S.devPowerupDrop ? 'DROP POWERUP ITEM:' : 'START WITH POWERUP:', W / 2, pwY);
@@ -707,7 +705,7 @@ function drawDevMenu(ctx) {
   }
 
   // Dev leaderboard controls
-  const dlY = startY + rows * (btnH + gap) + 146;
+  const dlY = pwY + 78;
   const dlX = W / 2 - 130;
   ctx.fillStyle = S.devLeaderboard ? '#224422' : '#333';
   ctx.fillRect(dlX, dlY, 260, 36);
@@ -797,59 +795,59 @@ function drawDevMenu(ctx) {
   ctx.fillStyle = '#ff6644';
   ctx.font = 'bold 13px monospace';
   ctx.fillText('JUMP TO GAME OVER', W / 2, goY + 22);
-}
 
-export function handleDevMenuClick(cx, cy) {
-  const cols = 5, rows = 3;
-  const btnW = 70, btnH = 50, gap = 10;
+  // Level select (rendered after settings)
+  const levelsTitleY = goY + 56;
+  ctx.fillStyle = '#ffcc00';
+  ctx.font = 'bold 13px monospace';
+  ctx.fillText(`LEVEL SELECT (1-${DEV_MENU_MAX_ROUND})`, W / 2, levelsTitleY);
+
   const gridW = cols * btnW + (cols - 1) * gap;
   const startX = (W - gridW) / 2;
-  const startY = 110;
+  const startY = levelsTitleY + 16;
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const r = row * cols + col + 1;
+      if (r > DEV_MENU_MAX_ROUND) continue;
       const bx = startX + col * (btnW + gap);
       const by = startY + row * (btnH + gap);
-      if (cx >= bx && cx <= bx + btnW && cy >= by && cy <= by + btnH) {
-        S.devMenuOpen = false;
-        S.gameState = 'playing';
-        playVoice('start', true);
-        musicClip.currentTime = 0;
-        musicClip.play().catch(() => {});
-        resetGameState(r);
-        S.currentThemeIndex = getThemeIndex(r);
-        initAmbientParticles();
-        initBgDetails();
-        if (S.devSpawnPowerup) {
-          if (S.devPowerupDrop) {
-            // Drop the pickup item immediately
-            if (S.devSpawnPowerup === 'metal') spawnMetalHat();
-            if (S.devSpawnPowerup === 'muscle') spawnSmoothie();
-            if (S.devSpawnPowerup === 'wings') spawnWings();
-            if (S.devSpawnPowerup === 'dwyer') spawnChestplate();
-            if (S.devSpawnPowerup === 'chris') spawnBeerCan();
-          } else {
-            // Apply instantly
-            if (S.devSpawnPowerup === 'metal') S.player.metalTimer = METAL_DURATION;
-            if (S.devSpawnPowerup === 'muscle') S.player.muscleTimer = MUSCLE_DURATION;
-            if (S.devSpawnPowerup === 'wings') S.player.wingsTimer = WINGS_DURATION;
-            if (S.devSpawnPowerup === 'dwyer') S.dwyer = createDwyer();
-            if (S.devSpawnPowerup === 'chris') S.chris = createChris();
-          }
-        }
-        startRound(r);
-        return true;
+      const isBoss = r >= 3 && r % 3 === 0;
+      const isQPRound = isBoss && bossAppearance(r) >= 3;
+      ctx.fillStyle = isQPRound ? '#224422' : (isBoss ? '#442222' : '#333');
+      ctx.fillRect(bx, by, btnW, btnH);
+      ctx.strokeStyle = isQPRound ? '#44ff44' : (isBoss ? '#ff4444' : '#666');
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx, by, btnW, btnH);
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 16px monospace';
+      ctx.fillText(`R${r}`, bx + btnW / 2, by + 22);
+      if (isBoss) {
+        ctx.fillStyle = isQPRound ? '#44ff44' : '#ff6644';
+        ctx.font = '10px monospace';
+        ctx.fillText(isQPRound ? 'QP' : 'BOSS', bx + btnW / 2, by + 40);
       }
     }
   }
-  // Close button
-  const closeY = startY + rows * (btnH + gap) + 20;
-  if (cx >= W / 2 - 50 && cx <= W / 2 + 50 && cy >= closeY && cy <= closeY + 36) {
+}
+
+export function handleDevMenuClick(cx, cy) {
+  const cols = DEV_MENU_COLS;
+  const rows = Math.ceil(DEV_MENU_MAX_ROUND / cols);
+  const btnW = DEV_MENU_BTN_W;
+  const btnH = DEV_MENU_BTN_H;
+  const gap = DEV_MENU_GAP;
+  const settingsTop = 108;
+
+  // Top-right close button
+  const closeX = W - DEV_MENU_CLOSE_SIZE - DEV_MENU_CLOSE_MARGIN;
+  const closeY = DEV_MENU_CLOSE_MARGIN;
+  if (cx >= closeX && cx <= closeX + DEV_MENU_CLOSE_SIZE && cy >= closeY && cy <= closeY + DEV_MENU_CLOSE_SIZE) {
     S.devMenuOpen = false;
     return true;
   }
+
   // Dev powerup toggles
-  const pwY = startY + rows * (btnH + gap) + 72;
+  const pwY = settingsTop;
   const pwKeys = ['', 'metal', 'muscle', 'wings', 'dwyer', 'chris'];
   const pwBtnW = 60, pwGap = 6;
   const pwTotalW = pwKeys.length * pwBtnW + (pwKeys.length - 1) * pwGap;
@@ -874,7 +872,7 @@ export function handleDevMenuClick(cx, cy) {
     }
   }
   // Dev leaderboard controls
-  const dlY = startY + rows * (btnH + gap) + 146;
+  const dlY = pwY + 78;
   const dlX = W / 2 - 130;
   if (cx >= dlX && cx <= dlX + 260 && cy >= dlY && cy <= dlY + 36) {
     S.devLeaderboard = !S.devLeaderboard;
@@ -934,8 +932,7 @@ export function handleDevMenuClick(cx, cy) {
     }
   }
   // Dev gear controls
-  const dlYBase = startY + rows * (btnH + gap) + 146;
-  const gY = S.devLeaderboard ? dlYBase + 155 : dlYBase + 50;
+  const gY = S.devLeaderboard ? dlY + 155 : dlY + 50;
   const gBtnW = 120, gBtnH = 32, gGap = 10;
   const gStartX = W / 2 - gBtnW - gGap / 2;
   const clearX = gStartX + gBtnW + gGap;
@@ -971,6 +968,50 @@ export function handleDevMenuClick(cx, cy) {
     return true;
   }
 
+  // Level select
+  const levelsTitleY = goBtnY + 56;
+  const startY = levelsTitleY + 16;
+  const gridW = cols * btnW + (cols - 1) * gap;
+  const startX = (W - gridW) / 2;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const r = row * cols + col + 1;
+      if (r > DEV_MENU_MAX_ROUND) continue;
+      const bx = startX + col * (btnW + gap);
+      const by = startY + row * (btnH + gap);
+      if (cx >= bx && cx <= bx + btnW && cy >= by && cy <= by + btnH) {
+        S.devMenuOpen = false;
+        S.gameState = 'playing';
+        playVoice('start', true);
+        musicClip.currentTime = 0;
+        musicClip.play().catch(() => {});
+        resetGameState(r);
+        S.currentThemeIndex = getThemeIndex(r);
+        initAmbientParticles();
+        initBgDetails();
+        if (S.devSpawnPowerup) {
+          if (S.devPowerupDrop) {
+            // Drop the pickup item immediately
+            if (S.devSpawnPowerup === 'metal') spawnMetalHat();
+            if (S.devSpawnPowerup === 'muscle') spawnSmoothie();
+            if (S.devSpawnPowerup === 'wings') spawnWings();
+            if (S.devSpawnPowerup === 'dwyer') spawnChestplate();
+            if (S.devSpawnPowerup === 'chris') spawnBeerCan();
+          } else {
+            // Apply instantly
+            if (S.devSpawnPowerup === 'metal') S.player.metalTimer = METAL_DURATION;
+            if (S.devSpawnPowerup === 'muscle') S.player.muscleTimer = MUSCLE_DURATION;
+            if (S.devSpawnPowerup === 'wings') S.player.wingsTimer = WINGS_DURATION;
+            if (S.devSpawnPowerup === 'dwyer') S.dwyer = createDwyer();
+            if (S.devSpawnPowerup === 'chris') S.chris = createChris();
+          }
+        }
+        startRound(r);
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
@@ -996,7 +1037,10 @@ export function drawRoundTransition() {
     const themeColors = {
       'SPACE STATION': `rgba(100,160,255,${pulse})`,
       'XENO JUNGLE': `rgba(80,255,100,${pulse})`,
-      'VOLCANIC CORE': `rgba(255,120,40,${pulse})`
+      'VOLCANIC CORE': `rgba(255,120,40,${pulse})`,
+      'UNDERWATER': `rgba(80,220,255,${pulse})`,
+      'CASTLE': `rgba(190,170,140,${pulse})`,
+      'DUPONT CIRCLE DC': `rgba(150,200,255,${pulse})`
     };
     ctx.fillStyle = themeColors[nextTheme.name] || '#fff';
     ctx.font = 'bold 20px monospace';

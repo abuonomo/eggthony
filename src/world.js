@@ -23,6 +23,14 @@ export function getTheme() {
   return THEMES[S.currentThemeIndex];
 }
 
+function getBackgroundStyle(theme) {
+  if (theme.name === 'CASTLE') return 'castle';
+  if (theme.name === 'DUPONT CIRCLE DC') return 'dupont';
+  if (theme.ambientType === 'stars') return 'space';
+  if (theme.ambientType === 'spores') return 'jungle';
+  return 'volcanic';
+}
+
 // ============================================================
 // AMBIENT PARTICLES (theme-aware: stars / spores / embers)
 // ============================================================
@@ -136,8 +144,9 @@ export function drawAmbientParticles() {
 export function initBgDetails() {
   S.bgDetails = {};
   const theme = getTheme();
+  const bgStyle = getBackgroundStyle(theme);
 
-  if (theme.ambientType === 'stars') {
+  if (bgStyle === 'space') {
     // Hull panel lines for space station
     S.bgDetails.hullPanels = [];
     for (let i = 0; i < 8; i++) {
@@ -148,7 +157,7 @@ export function initBgDetails() {
         h: 30 + random() * 60
       });
     }
-  } else if (theme.ambientType === 'spores') {
+  } else if (bgStyle === 'jungle') {
     // Hanging vines at top
     S.bgDetails.vines = [];
     for (let i = 0; i < 12; i++) {
@@ -176,7 +185,7 @@ export function initBgDetails() {
         y: -10 + random() * 20
       });
     }
-  } else { // embers / volcanic
+  } else if (bgStyle === 'volcanic') {
     // Stalactites at top
     S.bgDetails.stalactites = [];
     for (let i = 0; i < 10; i++) {
@@ -200,6 +209,81 @@ export function initBgDetails() {
       }
       S.bgDetails.magmaVeins.push({ startX, startY, segs });
     }
+  } else if (bgStyle === 'castle') {
+    S.bgDetails.castleMoon = {
+      x: W * 0.72 + (random() - 0.5) * 40,
+      y: 80 + random() * 24,
+      r: 26 + random() * 10
+    };
+    S.bgDetails.castleTowers = [];
+    const towerCount = 6;
+    const spacing = W / (towerCount - 1);
+    for (let i = 0; i < towerCount; i++) {
+      const w = 46 + random() * 26;
+      const h = 120 + random() * 120;
+      const cx = i * spacing + (random() - 0.5) * 18;
+      const windows = [];
+      const windowCount = 3 + Math.floor(random() * 4);
+      for (let j = 0; j < windowCount; j++) {
+        windows.push({
+          rx: 8 + random() * (w - 16),
+          ry: 14 + random() * (h - 36),
+          lit: random() < 0.75,
+          phase: random() * Math.PI * 2
+        });
+      }
+      S.bgDetails.castleTowers.push({
+        x: cx - w / 2,
+        w,
+        h,
+        windows,
+        bannerDir: random() < 0.55 ? (random() < 0.5 ? -1 : 1) : 0
+      });
+    }
+  } else if (bgStyle === 'dupont') {
+    S.bgDetails.bgTrees = [];
+    for (let i = 0; i < 10; i++) {
+      const x = 20 + (i / 9) * (W - 40) + (random() - 0.5) * 18;
+      S.bgDetails.bgTrees.push({
+        x,
+        baseY: PLATFORM_Y - 10 + (random() - 0.5) * 16,
+        trunkH: 44 + random() * 26,
+        canopyR: 18 + random() * 12,
+        hueMix: random()
+      });
+    }
+
+    S.bgDetails.fountain = {
+      x: W / 2,
+      y: PLATFORM_Y - 145,
+      topBowlW: 190,
+      topBowlH: 18,
+      basinW: 250,
+      basinH: 34
+    };
+
+    S.bgDetails.fallLeaves = [];
+    for (let i = 0; i < 95; i++) {
+      S.bgDetails.fallLeaves.push({
+        x: random() * W,
+        y: random() * (PLATFORM_Y + 30),
+        speed: 10 + random() * 22,
+        sway: 1 + random() * 1.8,
+        size: 2 + random() * 4,
+        phase: random() * Math.PI * 2
+      });
+    }
+
+    S.bgDetails.groundLeaves = [];
+    for (let i = 0; i < 55; i++) {
+      S.bgDetails.groundLeaves.push({
+        x: random() * W,
+        y: PLATFORM_Y - 16 + random() * 20,
+        size: 2 + random() * 3,
+        phase: random() * Math.PI * 2,
+        hueMix: random()
+      });
+    }
   }
 }
 
@@ -209,6 +293,7 @@ export function initBgDetails() {
 export function drawBackground() {
   const ctx = S.ctx;
   const theme = getTheme();
+  const bgStyle = getBackgroundStyle(theme);
 
   // Gradient fill
   const grad = ctx.createLinearGradient(0, 0, 0, H);
@@ -218,11 +303,11 @@ export function drawBackground() {
   ctx.fillRect(-10, -10, W + 20, H + 20);
 
   // Theme-specific background decorations
-  if (theme.ambientType === 'stars') {
+  if (bgStyle === 'space') {
     // Subtle blue nebula glow
     const ncx = W * 0.3, ncy = H * 0.25;
     const nebGrad = ctx.createRadialGradient(ncx, ncy, 20, ncx, ncy, 180);
-    nebGrad.addColorStop(0, theme.nebulaColor);
+    nebGrad.addColorStop(0, theme.nebulaColor || 'rgba(30,60,120,0.08)');
     nebGrad.addColorStop(1, 'rgba(30,60,120,0)');
     ctx.fillStyle = nebGrad;
     ctx.fillRect(0, 0, W, H);
@@ -233,7 +318,7 @@ export function drawBackground() {
     for (const p of S.bgDetails.hullPanels || []) {
       ctx.strokeRect(p.x, p.y, p.w, p.h);
     }
-  } else if (theme.ambientType === 'spores') {
+  } else if (bgStyle === 'jungle') {
     // Alien canopy silhouettes at top
     ctx.fillStyle = 'rgba(10,40,20,0.5)';
     for (const c of S.bgDetails.canopy || []) {
@@ -272,7 +357,7 @@ export function drawBackground() {
     fogGrad.addColorStop(1, 'rgba(20,60,30,0.15)');
     ctx.fillStyle = fogGrad;
     ctx.fillRect(0, PLATFORM_Y - 60, W, 60);
-  } else { // volcanic
+  } else if (bgStyle === 'volcanic') {
     // Lava glow from below
     const lavaGrad = ctx.createLinearGradient(0, PLATFORM_Y, 0, H);
     lavaGrad.addColorStop(0, 'rgba(200,80,10,0.08)');
@@ -314,6 +399,181 @@ export function drawBackground() {
         ctx.lineTo(seg.x, seg.y);
       }
       ctx.stroke();
+    }
+  } else if (bgStyle === 'castle') {
+    const moon = S.bgDetails.castleMoon || { x: W * 0.72, y: 92, r: 30 };
+    const moonGlow = ctx.createRadialGradient(moon.x, moon.y, moon.r * 0.2, moon.x, moon.y, moon.r * 4);
+    moonGlow.addColorStop(0, 'rgba(220,220,255,0.22)');
+    moonGlow.addColorStop(1, 'rgba(220,220,255,0)');
+    ctx.fillStyle = moonGlow;
+    ctx.fillRect(0, 0, W, H);
+
+    ctx.fillStyle = 'rgba(215,220,240,0.2)';
+    ctx.beginPath();
+    ctx.arc(moon.x, moon.y, moon.r, 0, Math.PI * 2);
+    ctx.fill();
+
+    const baseY = PLATFORM_Y + 30;
+    const wallTop = baseY - 86;
+    ctx.fillStyle = 'rgba(42,36,50,0.84)';
+    ctx.fillRect(-20, wallTop, W + 40, baseY - wallTop);
+
+    // Wall crenellations
+    ctx.fillStyle = 'rgba(68,60,80,0.72)';
+    for (let x = -10; x < W + 20; x += 18) {
+      ctx.fillRect(x, wallTop - 10, 12, 10);
+    }
+
+    // Main gate
+    ctx.fillStyle = 'rgba(18,16,24,0.8)';
+    const gateW = 64, gateH = 74, gateX = W / 2 - gateW / 2;
+    ctx.fillRect(gateX, baseY - gateH, gateW, gateH);
+    ctx.beginPath();
+    ctx.arc(W / 2, baseY - gateH, gateW / 2, Math.PI, 0);
+    ctx.fill();
+
+    for (const tower of S.bgDetails.castleTowers || []) {
+      const topY = baseY - tower.h;
+      ctx.fillStyle = 'rgba(54,48,64,0.86)';
+      ctx.fillRect(tower.x, topY, tower.w, tower.h);
+
+      // Tower crenellations
+      ctx.fillStyle = 'rgba(80,72,92,0.76)';
+      const crenels = Math.max(3, Math.floor(tower.w / 13));
+      const crenelW = tower.w / crenels;
+      for (let i = 0; i < crenels; i += 2) {
+        ctx.fillRect(tower.x + i * crenelW, topY - 9, crenelW * 0.82, 9);
+      }
+
+      // Lit window slits
+      const flicker = 0.55 + 0.25 * Math.sin(performance.now() * 0.003);
+      for (const w of tower.windows) {
+        if (!w.lit) continue;
+        const alpha = 0.22 + flicker * 0.25 + Math.sin(performance.now() * 0.004 + w.phase) * 0.08;
+        ctx.fillStyle = `rgba(255,210,120,${Math.max(0.1, alpha)})`;
+        ctx.fillRect(tower.x + w.rx, topY + w.ry, 3, 8);
+      }
+
+      if (tower.bannerDir !== 0) {
+        const bx = tower.bannerDir < 0 ? tower.x + 5 : tower.x + tower.w - 5;
+        const by = topY + 22;
+        ctx.strokeStyle = 'rgba(100,90,120,0.7)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(bx, by - 10);
+        ctx.lineTo(bx, by + 16);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(145,40,50,0.55)';
+        ctx.beginPath();
+        ctx.moveTo(bx, by - 9);
+        ctx.lineTo(bx + tower.bannerDir * 16, by - 5);
+        ctx.lineTo(bx, by + 2);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  } else if (bgStyle === 'dupont') {
+    // Warm autumn haze
+    const haze = ctx.createLinearGradient(0, 0, 0, PLATFORM_Y);
+    haze.addColorStop(0, 'rgba(165,180,210,0.07)');
+    haze.addColorStop(0.55, 'rgba(205,160,120,0.12)');
+    haze.addColorStop(1, 'rgba(220,145,95,0.22)');
+    ctx.fillStyle = haze;
+    ctx.fillRect(0, 0, W, PLATFORM_Y);
+
+    // Flat background trees (autumn palette)
+    for (const tr of S.bgDetails.bgTrees || []) {
+      ctx.fillStyle = 'rgba(85,62,44,0.32)';
+      ctx.fillRect(tr.x - 2, tr.baseY - tr.trunkH, 4, tr.trunkH);
+
+      const c1 = tr.hueMix < 0.33 ? 'rgba(228,135,62,0.26)' :
+        (tr.hueMix < 0.66 ? 'rgba(206,92,56,0.24)' : 'rgba(244,176,78,0.26)');
+      const c2 = tr.hueMix < 0.33 ? 'rgba(235,164,78,0.22)' :
+        (tr.hueMix < 0.66 ? 'rgba(222,118,74,0.21)' : 'rgba(252,194,102,0.22)');
+
+      ctx.fillStyle = c1;
+      ctx.beginPath();
+      ctx.arc(tr.x, tr.baseY - tr.trunkH - tr.canopyR * 0.25, tr.canopyR, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = c2;
+      ctx.beginPath();
+      ctx.arc(tr.x - tr.canopyR * 0.6, tr.baseY - tr.trunkH - tr.canopyR * 0.05, tr.canopyR * 0.62, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(tr.x + tr.canopyR * 0.6, tr.baseY - tr.trunkH - tr.canopyR * 0.05, tr.canopyR * 0.62, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Flat, front-facing fountain
+    const f = S.bgDetails.fountain || {
+      x: W / 2,
+      y: PLATFORM_Y - 145,
+      topBowlW: 190,
+      topBowlH: 18,
+      basinW: 250,
+      basinH: 34
+    };
+
+    // Keep fountain faint so it reads as background art, not an interactable object.
+    ctx.save();
+    ctx.globalAlpha = 0.34;
+    const shimmer = 0.65 + 0.2 * Math.sin(performance.now() * 0.0035);
+    ctx.fillStyle = 'rgba(116,122,132,0.52)';
+    ctx.fillRect(f.x - f.basinW / 2, f.y + 56, f.basinW, f.basinH);
+    ctx.fillStyle = 'rgba(185,192,205,0.42)';
+    ctx.fillRect(f.x - f.basinW / 2, f.y + 56, f.basinW, 3);
+
+    ctx.fillStyle = 'rgba(104,112,124,0.5)';
+    ctx.fillRect(f.x - 18, f.y + 14, 36, 44);
+    ctx.fillStyle = 'rgba(170,178,192,0.4)';
+    ctx.fillRect(f.x - 18, f.y + 14, 36, 3);
+
+    ctx.fillStyle = 'rgba(130,138,150,0.48)';
+    ctx.fillRect(f.x - f.topBowlW / 2, f.y, f.topBowlW, f.topBowlH);
+    ctx.fillStyle = 'rgba(190,198,210,0.38)';
+    ctx.fillRect(f.x - f.topBowlW / 2, f.y, f.topBowlW, 3);
+
+    ctx.fillStyle = `rgba(130,190,230,${0.24 * shimmer})`;
+    ctx.fillRect(f.x - f.topBowlW / 2 + 10, f.y + 4, f.topBowlW - 20, 7);
+    ctx.fillStyle = `rgba(120,185,225,${0.21 * shimmer})`;
+    ctx.fillRect(f.x - f.basinW / 2 + 12, f.y + 60, f.basinW - 24, f.basinH - 8);
+
+    // Water spray
+    const t = performance.now() * 0.0045;
+    ctx.strokeStyle = 'rgba(170,220,255,0.26)';
+    ctx.lineWidth = 1.2;
+    for (let i = -4; i <= 4; i++) {
+      const x1 = f.x + i * 11;
+      const y1 = f.y + 4;
+      const jetH = 18 + 7 * Math.sin(t + i * 0.8);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.quadraticCurveTo(x1 + i * 1.5, y1 - jetH, x1, y1 - jetH + 6);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // Falling autumn leaves
+    const tt = performance.now() * 0.001;
+    for (const lf of S.bgDetails.fallLeaves || []) {
+      const ly = (lf.y + tt * lf.speed) % (PLATFORM_Y + 40);
+      const lx = lf.x + Math.sin(tt * lf.sway + lf.phase) * 10;
+      const c = Math.sin(lf.phase) < -0.33 ? 'rgba(225,120,45,0.5)' :
+        (Math.sin(lf.phase) < 0.33 ? 'rgba(210,78,45,0.5)' : 'rgba(240,170,60,0.5)');
+      ctx.fillStyle = c;
+      ctx.beginPath();
+      ctx.ellipse(lx, ly, lf.size, lf.size * 0.65, Math.sin(tt * 2 + lf.phase), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Ground leaves
+    for (const lf of S.bgDetails.groundLeaves || []) {
+      const c = lf.hueMix < 0.33 ? 'rgba(210,98,38,0.42)' :
+        (lf.hueMix < 0.66 ? 'rgba(190,70,40,0.4)' : 'rgba(235,155,65,0.42)');
+      ctx.fillStyle = c;
+      ctx.beginPath();
+      ctx.ellipse(lf.x, lf.y, lf.size + 1, lf.size * 0.55, lf.phase, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
