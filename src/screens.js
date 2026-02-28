@@ -589,12 +589,21 @@ export function drawTitleScreen() {
     ctx.fillText('GEAR', gearBtnX + gearBtnW / 2, gearBtnY + 23);
   }
 
-  // Blink
+  // Start button
+  const startBtnW = 200, startBtnH = 50;
+  const startBtnX = W / 2 - startBtnW / 2;
+  const startBtnY = PLATFORM_Y - 70;
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(startBtnX, startBtnY, startBtnW, startBtnH);
+  ctx.strokeStyle = '#ffcc00';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(startBtnX, startBtnY, startBtnW, startBtnH);
   S.titleBlink += 0.03;
-  const alpha = 0.5 + 0.5 * Math.sin(S.titleBlink * 3);
-  ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+  const alpha = 0.7 + 0.3 * Math.sin(S.titleBlink * 3);
+  ctx.fillStyle = `rgba(255,204,0,${alpha})`;
   ctx.font = 'bold 20px monospace';
-  ctx.fillText(isMobile ? 'Tap to Start' : 'Click to Start', W / 2, PLATFORM_Y - 40);
+  ctx.textAlign = 'center';
+  ctx.fillText(isMobile ? 'TAP TO START' : 'CLICK TO START', W / 2, startBtnY + 32);
 
   // Dev menu overlay
   if (S.devMenuOpen) {
