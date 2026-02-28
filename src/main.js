@@ -135,6 +135,14 @@ canvas.addEventListener('click', (e) => {
       }
     }
 
+    // Start button hit test
+    const startBtnW = 200, startBtnH = 50;
+    const startBtnX = W / 2 - startBtnW / 2;
+    const startBtnY = PLATFORM_Y - 70;
+    if (cx < startBtnX || cx > startBtnX + startBtnW || cy < startBtnY || cy > startBtnY + startBtnH) {
+      return;
+    }
+
     // Normal start
     S.gameState = 'playing';
     playVoice('start', true);
