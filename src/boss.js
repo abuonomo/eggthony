@@ -6,7 +6,7 @@ import {
   SNOT_STORM_DURATION,
 } from './constants.js';
 import { random } from './rng.js';
-import { playSound, playNoise, playVoice, playClip, quentinFartClip, melodicaClip } from './audio.js';
+import { playSound, playNoise, playVoice, playClip, quentinFartClip, melodicaClip, deanJamClip } from './audio.js';
 import {
   evilSprite, evilSpriteLoaded, evilSprite2, evilSprite2Loaded,
   quentinPizzaSprite, quentinPizzaSpriteLoaded,
@@ -35,7 +35,7 @@ export function createBoss(r) {
   const isDean = app === 2; // Level 6
   // QP resets scale: qpApp counts from 1 on first QP appearance
   const qpApp = isQP ? app - 2 : app;
-  const scale = isQP ? 1 + (qpApp - 1) * 0.15 : (isDean ? 1.5 : 1 + (app - 1) * 0.2);
+  const scale = isQP ? 1 + (qpApp - 1) * 0.15 : (isDean ? 1.0 : 1 + (app - 1) * 0.2); // Reduced from 1.5 to 1.0
   const baseH = isQP ? 153 : (isDean ? 160 : 180);
   const baseW = isQP ? 153 : (isDean ? 100 : Math.round(180 * (818 / 1164))); 
   const w = Math.round(baseW * scale);
@@ -47,8 +47,8 @@ export function createBoss(r) {
     w, h,
     vx: 0,
     vy: 0,
-    hp: 300 + (app - 1) * 200,
-    maxHp: 300 + (app - 1) * 200,
+    hp: isDean ? 800 : 300 + (app - 1) * 200, // Explicitly bump Dean's HP
+    maxHp: isDean ? 800 : 300 + (app - 1) * 200, // Explicitly bump Dean's max HP
     damage: damage,
     scoreValue: 1000 + (app - 1) * 500,
     speed: 100 + (app - 1) * 15,
@@ -196,6 +196,10 @@ export function updateBoss(dt) {
         if (boss.isQuentinPizza) {
           boss.state = 'fart_windup';
           boss.fartTimer = 0.4;
+        } else if (boss.isDean) {
+          playClip(deanJamClip);
+          boss.state = 'idle';
+          boss.attackCooldown = 1.5;
         } else {
           boss.state = 'idle';
           boss.attackCooldown = 1.5;
