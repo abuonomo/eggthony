@@ -19,7 +19,9 @@ export function startRound(r) {
     S.bossEntering = true;
     S.bossDefeated = false;
     playSound('bossRoar');
-    playVoice('boss', true);
+    if (!S.boss.isDean && !S.boss.isQuentinPizza) {
+      playVoice('boss', true);
+    }
   } else {
     S.waveEnemiesTotal = 4 + r * 2;
     S.waveEnemiesSpawned = 0;
