@@ -19,7 +19,7 @@ export function startRound(r) {
     S.bossEntering = true;
     S.bossDefeated = false;
     playSound('bossRoar');
-    if (!S.boss.isDean && !S.boss.isQuentinPizza) {
+    if (S.boss.appearance === 1) {
       playVoice('boss', true);
     }
   } else {
