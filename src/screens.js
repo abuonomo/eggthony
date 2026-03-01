@@ -975,6 +975,70 @@ export function handleDevMenuClick(cx, cy) {
 }
 
 // ============================================================
+// PAUSE SCREEN
+// ============================================================
+export function drawPauseScreen() {
+  const ctx = S.ctx;
+
+  ctx.fillStyle = 'rgba(0,0,0,0.6)';
+  ctx.fillRect(0, 0, W, H);
+
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 40px monospace';
+  ctx.fillText('PAUSED', W / 2, H / 2 - 60);
+
+  // RESUME button
+  const rBtnW = 200, rBtnH = 50;
+  const rBtnX = W / 2 - rBtnW / 2, rBtnY = H / 2 - 15;
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(rBtnX, rBtnY, rBtnW, rBtnH);
+  ctx.strokeStyle = '#44ff44';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(rBtnX, rBtnY, rBtnW, rBtnH);
+  ctx.fillStyle = '#44ff44';
+  ctx.font = 'bold 22px monospace';
+  ctx.fillText('RESUME', W / 2, rBtnY + 33);
+
+  // QUIT button
+  const qBtnY = rBtnY + rBtnH + 16;
+  ctx.fillStyle = '#1a1a2e';
+  ctx.fillRect(rBtnX, qBtnY, rBtnW, rBtnH);
+  ctx.strokeStyle = '#ff4444';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(rBtnX, qBtnY, rBtnW, rBtnH);
+  ctx.fillStyle = '#ff4444';
+  ctx.font = 'bold 22px monospace';
+  ctx.fillText('QUIT', W / 2, qBtnY + 33);
+
+  // Hint
+  ctx.fillStyle = '#666';
+  ctx.font = '14px monospace';
+  ctx.fillText(isMobile ? 'or tap pause button' : 'or press ESC', W / 2, qBtnY + rBtnH + 30);
+}
+
+export function handlePauseClick(cx, cy) {
+  const rBtnW = 200, rBtnH = 50;
+  const rBtnX = W / 2 - rBtnW / 2, rBtnY = H / 2 - 15;
+  const qBtnY = rBtnY + rBtnH + 16;
+
+  // RESUME
+  if (cx >= rBtnX && cx <= rBtnX + rBtnW && cy >= rBtnY && cy <= rBtnY + rBtnH) {
+    S.gameState = 'playing';
+    return true;
+  }
+  // QUIT
+  if (cx >= rBtnX && cx <= rBtnX + rBtnW && cy >= qBtnY && cy <= qBtnY + rBtnH) {
+    S.gameState = 'title';
+    musicClip.pause();
+    musicClip.currentTime = 0;
+    fetchLeaderboard();
+    return true;
+  }
+  return false;
+}
+
+// ============================================================
 // ROUND TRANSITION
 // ============================================================
 export function drawRoundTransition() {

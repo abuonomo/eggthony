@@ -20,6 +20,7 @@ import { initAmbientParticles, initBgDetails,
          drawBackground, drawPlatform, drawFloatingPlatforms } from './world.js';
 import { startRound } from './waves.js';
 import { drawHUD, drawTitleScreen, drawRoundTransition, drawGameOver,
+         drawPauseScreen, handlePauseClick,
          handleDevMenuClick, fetchLeaderboard, showNameInput, hideNameInput,
          initNameOverlay } from './screens.js';
 import { loadGear, loadGearSprites, setPlayerSprite,
@@ -91,6 +92,11 @@ canvas.addEventListener('click', (e) => {
   const rect = canvas.getBoundingClientRect();
   const cx = (e.clientX - rect.left) * (W / rect.width);
   const cy = (e.clientY - rect.top) * (H / rect.height);
+
+  if (S.gameState === 'paused') {
+    handlePauseClick(cx, cy);
+    return;
+  }
 
   if (S.gameState === 'equipScreen') {
     handleEquipScreenClick(cx, cy);
@@ -202,7 +208,7 @@ function gameLoop(now) {
 
 function draw() {
   // Show cursor on menu screens, hide during gameplay
-  const menuState = S.gameState === 'title' || S.gameState === 'equipScreen' || S.gameState === 'gameOver' || S.gameState === 'gearDrop';
+  const menuState = S.gameState === 'title' || S.gameState === 'equipScreen' || S.gameState === 'gameOver' || S.gameState === 'gearDrop' || S.gameState === 'paused';
   canvas.style.cursor = menuState ? 'default' : 'none';
 
   ctx.save();
@@ -247,15 +253,7 @@ function draw() {
     if (isMobile) drawTouchHUD();
 
     if (S.gameState === 'paused') {
-      ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.fillRect(0, 0, W, H);
-      ctx.textAlign = 'center';
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 40px monospace';
-      ctx.fillText('PAUSED', W / 2, H / 2 - 10);
-      ctx.font = '16px monospace';
-      ctx.fillStyle = '#aaa';
-      ctx.fillText('Press ESC to resume', W / 2, H / 2 + 30);
+      drawPauseScreen();
     } else if (S.gameState === 'roundTransition') {
       drawRoundTransition();
     } else if (S.gameState === 'gearDrop') {

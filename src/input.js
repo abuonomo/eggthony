@@ -147,6 +147,7 @@ export function setupTouch() {
   const ZAP_BTN = { x: W - 70, y: H - 80, r: 44 };
   const SNOT_BTN = { x: W - 160, y: H - 80, r: 36 };
   const JUMP_BTN = { x: W - 70, y: H - 185, r: 38 };
+  const PAUSE_BTN = { x: W - 30, y: 22, w: 44, h: 32 };
 
   function touchToCanvas(touch) {
     const rect = canvas.getBoundingClientRect();
@@ -165,7 +166,8 @@ export function setupTouch() {
     ensureAudio();
 
     if (S.gameState === 'title' || S.gameState === 'gameOver' ||
-        S.gameState === 'equipScreen' || S.gameState === 'gearDrop') {
+        S.gameState === 'equipScreen' || S.gameState === 'gearDrop' ||
+        S.gameState === 'paused') {
       const tc = touchToCanvas(e.changedTouches[0]);
       if (S.gameState === 'title' && S.devMenuOpen) {
         const synth = new MouseEvent('click', {
@@ -196,6 +198,13 @@ export function setupTouch() {
 
     for (const touch of e.changedTouches) {
       const c = touchToCanvas(touch);
+      // Pause button during gameplay
+      if (S.gameState === 'playing' &&
+          c.x >= PAUSE_BTN.x - PAUSE_BTN.w / 2 && c.x <= PAUSE_BTN.x + PAUSE_BTN.w / 2 &&
+          c.y >= PAUSE_BTN.y - PAUSE_BTN.h / 2 && c.y <= PAUSE_BTN.y + PAUSE_BTN.h / 2) {
+        S.gameState = 'paused';
+        continue;
+      }
       if (attackTouch === null && inCircle(c.x, c.y, ZAP_BTN.x, ZAP_BTN.y, ZAP_BTN.r + 10)) {
         attackTouch = touch.identifier;
         autoAimMouse();
@@ -292,7 +301,7 @@ export function setupTouch() {
     get snotTouch() { return snotTouch; },
     get joyOrigin() { return joyOrigin; },
     get joyPos() { return joyPos; },
-    ZAP_BTN, SNOT_BTN, JUMP_BTN,
+    ZAP_BTN, SNOT_BTN, JUMP_BTN, PAUSE_BTN,
   };
 }
 
@@ -302,7 +311,7 @@ export function drawTouchHUD() {
   const { ctx, player, _touch: t } = S;
   if (!t) return;
 
-  const { ZAP_BTN, SNOT_BTN, JUMP_BTN } = t;
+  const { ZAP_BTN, SNOT_BTN, JUMP_BTN, PAUSE_BTN } = t;
   const attackTouch = t.attackTouch;
   const jumpTouch = t.jumpTouch;
   const snotTouch = t.snotTouch;
@@ -373,6 +382,23 @@ export function drawTouchHUD() {
   ctx.fillStyle = jumpActive ? '#88ff88' : 'rgba(255,255,255,0.45)';
   ctx.font = 'bold 13px monospace';
   ctx.fillText('JUMP', JUMP_BTN.x, JUMP_BTN.y + 5);
+
+  // Pause button (top-right, only during gameplay)
+  if (S.gameState === 'playing') {
+    const px = PAUSE_BTN.x - PAUSE_BTN.w / 2;
+    const py = PAUSE_BTN.y - PAUSE_BTN.h / 2;
+    ctx.fillStyle = 'rgba(255,255,255,0.08)';
+    ctx.fillRect(px, py, PAUSE_BTN.w, PAUSE_BTN.h);
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(px, py, PAUSE_BTN.w, PAUSE_BTN.h);
+    // Draw two vertical bars (pause icon)
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    const barW = 5, barH = 16;
+    const gap = 5;
+    ctx.fillRect(PAUSE_BTN.x - gap / 2 - barW, PAUSE_BTN.y - barH / 2, barW, barH);
+    ctx.fillRect(PAUSE_BTN.x + gap / 2, PAUSE_BTN.y - barH / 2, barW, barH);
+  }
 
   // Joystick
   const STICK_BASE_X = 80;
