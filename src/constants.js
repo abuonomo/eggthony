@@ -118,6 +118,13 @@ export const FART_CLOUD_TICK = 0.5;
 // Boss
 export const CROWN_ANIM_DURATION = 3.0;
 
+// Health heart
+export const HEART_SIZE = 28;
+export const HEART_HEAL = 25;
+export const HEART_SPEED = 220;
+export const HEART_Y_MIN = 40;
+export const HEART_Y_MAX = 100;
+
 // Wave balancing
 export const MAX_ALIVE_ENEMIES_BASE = 8;
 export const MAX_ALIVE_ENEMIES_CAP = 14;

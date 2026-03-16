@@ -131,6 +131,8 @@ export const S = {
   chris: null,
   beerCanItem: null,
   chrisCans: [],
+  heartItem: null,
+  heartSpawnTimer: 30 + random() * 15,
 
   // Gear system
   gear: { version: 1, inventory: [], equipped: { head: null, body: null, collar: null, accessory: null }, totalBuffs: { maxHp: 0, speed: 0, jumpForce: 0, damage: 0, dropLuck: 0 } },
@@ -212,6 +214,8 @@ export function resetGameState(r) {
   S.chris = null;
   S.beerCanItem = null;
   S.chrisCans = [];
+  S.heartItem = null;
+  S.heartSpawnTimer = 30 + random() * 15;
   S.campSpider = null;
   S.campTimer = 0;
   S.boss = null;
