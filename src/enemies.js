@@ -29,7 +29,7 @@ export function getEnemySprite(type) {
 
 export function createEnemy(type, round) {
   const def = ENEMY_TYPES[type];
-  const hpBonus = (round - 1) * 15;
+  const hpBonus = (round - 1) * 5;
   const w = def.baseW;
   const h = def.baseH;
   const spawnX = PLATFORM_X + random() * (PLATFORM_W - w);
