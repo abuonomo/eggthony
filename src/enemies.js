@@ -29,7 +29,7 @@ export function getEnemySprite(type) {
 
 export function createEnemy(type, round) {
   const def = ENEMY_TYPES[type];
-  const hpBonus = (round - 1) * 15;
+  const hpBonus = (round - 1) * 10;
   const w = def.baseW;
   const h = def.baseH;
   const spawnX = PLATFORM_X + random() * (PLATFORM_W - w);
@@ -55,6 +55,8 @@ export function createEnemy(type, round) {
     shootTimer: (def.shootCooldown || 0) * random(),
     charging: false,
     chargeTimer: 0,
+    telegraphTimer: 0,
+    telegraphAngle: 0,
     facingRight: random() > 0.5,
     animTimer: random() * Math.PI * 2,
     freezeTimer: 0
@@ -63,7 +65,9 @@ export function createEnemy(type, round) {
 
 export function spawnEnemyForRound(round) {
   let type = 'grunt';
-  if (round >= 5 && random() < 0.25) {
+  // Brutes: 15% at R5, +2.5% per round beyond 5, cap 30%
+  const bruteChance = Math.min(0.30, 0.15 + (round - 5) * 0.025);
+  if (round >= 5 && random() < bruteChance) {
     type = 'brute';
   } else if (round >= 3 && random() < 0.35) {
     type = 'spitter';
@@ -194,22 +198,35 @@ export function updateEnemies(dt) {
         if (dist > def.shootRange) {
           e.vx = Math.sign(dx) * e.speed;
           e.x += e.vx * dt;
+          e.telegraphTimer = 0;
         } else {
           e.vx = 0;
-          e.shootTimer -= dt;
-          if (e.shootTimer <= 0) {
-            e.shootTimer = def.shootCooldown;
-            const angle = Math.atan2(pcy - (e.y + e.h / 2), pcx - (e.x + e.w / 2));
-            enemyProjectiles.push({
-              x: e.x + e.w / 2,
-              y: e.y + e.h / 2,
-              vx: Math.cos(angle) * def.projectileSpeed,
-              vy: Math.sin(angle) * def.projectileSpeed,
-              damage: 15,
-              life: 3,
-              color: '#ff44ff'
-            });
-            playSound('spitterShoot');
+          // Telegraph phase: charge up before firing
+          if (e.telegraphTimer > 0) {
+            e.telegraphTimer -= dt;
+            e.telegraphAngle = Math.atan2(pcy - (e.y + e.h / 2), pcx - (e.x + e.w / 2));
+            if (e.telegraphTimer <= 0) {
+              // Fire!
+              const angle = e.telegraphAngle;
+              enemyProjectiles.push({
+                x: e.x + e.w / 2,
+                y: e.y + e.h / 2,
+                vx: Math.cos(angle) * def.projectileSpeed,
+                vy: Math.sin(angle) * def.projectileSpeed,
+                damage: 15,
+                life: 3,
+                color: '#ff44ff',
+                trail: []
+              });
+              playSound('spitterShoot');
+            }
+          } else {
+            e.shootTimer -= dt;
+            if (e.shootTimer <= 0) {
+              e.shootTimer = def.shootCooldown;
+              e.telegraphTimer = 0.4;
+              e.telegraphAngle = Math.atan2(pcy - (e.y + e.h / 2), pcx - (e.x + e.w / 2));
+            }
           }
         }
         break;
@@ -308,6 +325,10 @@ export function updateEnemyProjectiles(dt) {
 
   for (let i = enemyProjectiles.length - 1; i >= 0; i--) {
     const p = enemyProjectiles[i];
+    // Update trail
+    if (!p.trail) p.trail = [];
+    p.trail.push({ x: p.x, y: p.y });
+    if (p.trail.length > 4) p.trail.shift();
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.life -= dt;
@@ -490,13 +511,52 @@ export function drawEnemies() {
     ctx.globalAlpha = 1;
   }
 
-  // Enemy projectiles
+  // Spitter telegraph indicators
+  for (const e of enemies) {
+    if (e.type === 'spitter' && e.telegraphTimer > 0 && !e.dying) {
+      const ex = e.x + e.w / 2;
+      const ey = e.y + e.h / 2;
+      const pulse = 0.4 + Math.sin(performance.now() * 0.025) * 0.4;
+
+      // Pulsing glow ring around spitter
+      ctx.strokeStyle = `rgba(255,68,255,${pulse * 0.6})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(ex, ey, e.w * 0.6 + pulse * 4, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Aim line (dotted)
+      const angle = e.telegraphAngle;
+      ctx.strokeStyle = `rgba(255,68,255,${pulse * 0.4})`;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 6]);
+      ctx.beginPath();
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex + Math.cos(angle) * 120, ey + Math.sin(angle) * 120);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Enemy projectiles (with trails)
   for (const p of enemyProjectiles) {
+    // Draw trail afterimages
+    if (p.trail) {
+      for (let t = 0; t < p.trail.length; t++) {
+        const alpha = (t + 1) / (p.trail.length + 1) * 0.4;
+        const radius = 8 * (t + 1) / (p.trail.length + 1);
+        ctx.fillStyle = `rgba(255,68,255,${alpha})`;
+        ctx.beginPath();
+        ctx.arc(p.trail[t].x, p.trail[t].y, radius, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+    // Main projectile
     ctx.fillStyle = p.color;
     ctx.shadowColor = p.color;
-    ctx.shadowBlur = 10;
+    ctx.shadowBlur = 12;
     ctx.beginPath();
-    ctx.arc(p.x, p.y, 6, 0, Math.PI * 2);
+    ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
     ctx.fill();
     ctx.shadowBlur = 0;
   }
