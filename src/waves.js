@@ -1,5 +1,5 @@
 import { S } from './state.js';
-import { SNOT_STORM_DURATION } from './constants.js';
+import { SNOT_STORM_DURATION, MAX_ALIVE_ENEMIES_BASE, MAX_ALIVE_ENEMIES_CAP } from './constants.js';
 import { playSound, playVoice } from './audio.js';
 import { createBoss, isBossRound } from './boss.js';
 import { spawnEnemyForRound } from './enemies.js';
@@ -21,7 +21,7 @@ export function startRound(r) {
     playSound('bossRoar');
     playVoice('boss', true);
   } else {
-    S.waveEnemiesTotal = 3 + r * 3;
+    S.waveEnemiesTotal = 4 + r * 2;
     S.waveEnemiesSpawned = 0;
     S.waveEnemiesRemaining = S.waveEnemiesTotal;
     S.waveSpawnTimer = 0;
@@ -50,13 +50,17 @@ export function updateWaves(dt) {
     return;
   }
 
-  // Spawn enemies
-  const spawnInterval = Math.max(0.4, 1.5 - S.round * 0.1);
+  // Spawn enemies (gated by max alive cap)
+  const spawnInterval = Math.max(0.4, 1.6 - S.round * 0.07);
+  const maxAlive = Math.min(MAX_ALIVE_ENEMIES_CAP, MAX_ALIVE_ENEMIES_BASE + Math.floor(S.round / 3));
+  const aliveCount = S.enemies.filter(e => !e.dying).length;
   if (S.waveEnemiesSpawned < S.waveEnemiesTotal) {
     S.waveSpawnTimer -= dt;
     if (S.waveSpawnTimer <= 0) {
-      spawnEnemyForRound(S.round);
-      S.waveEnemiesSpawned++;
+      if (aliveCount < maxAlive) {
+        spawnEnemyForRound(S.round);
+        S.waveEnemiesSpawned++;
+      }
       S.waveSpawnTimer = spawnInterval;
     }
   }
