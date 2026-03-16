@@ -119,8 +119,8 @@ export const FART_CLOUD_TICK = 0.5;
 export const CROWN_ANIM_DURATION = 3.0;
 
 // Wave balancing
-export const MAX_ALIVE_ENEMIES_BASE = 6;
-export const MAX_ALIVE_ENEMIES_CAP = 12;
+export const MAX_ALIVE_ENEMIES_BASE = 8;
+export const MAX_ALIVE_ENEMIES_CAP = 14;
 
 // Camp spider
 export const CAMP_SPIDER_DELAY = 4.0;
@@ -221,12 +221,12 @@ export const ENEMY_TYPES = {
   brute: {
     color: '#cc6622',
     eyeColor: '#ff4444',
-    baseHp: 90,
+    baseHp: 120,
     baseW: 72,
     baseH: 74,
     speed: 120,
-    damage: 18,
+    damage: 25,
     score: 300,
-    chargeSpeed: 260
+    chargeSpeed: 300
   }
 };
