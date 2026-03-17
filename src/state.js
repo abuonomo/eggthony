@@ -38,6 +38,7 @@ export const S = {
   devTapTimer: 0,
   devSpawnPowerup: '',
   devPowerupDrop: false,
+  devInvulnerable: false,
   devLeaderboard: typeof localStorage !== 'undefined' && localStorage.getItem('eggthonyDevLB') === 'true',
 
   // Leaderboard

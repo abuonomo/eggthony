@@ -215,6 +215,7 @@ function skipLeaderboardInput() {
 export function drawHUD() {
   const ctx = S.ctx;
   const { player } = S;
+  const boss = S.boss;
 
   // HP Bar
   const barX = 12, barY = 12, barW = 140, barH = 16;
@@ -259,6 +260,34 @@ export function drawHUD() {
   ctx.font = 'bold 13px monospace';
   ctx.fillStyle = '#fff';
   ctx.fillText(`Score: ${S.score}`, W - 12, 22);
+
+  if (S.devInvulnerable) {
+    ctx.textAlign = 'left';
+    ctx.font = 'bold 10px monospace';
+    ctx.fillStyle = '#88ff88';
+    ctx.fillText('INVULN', 12, 40);
+  }
+
+  if (boss && boss.isWill && boss.state === 'will_beam_fire' && boss.willBeamPlayerCaught) {
+    const progress = Math.max(0, Math.min(1, boss.willBeamMashMeter));
+    const barW = 58;
+    const barH = 6;
+    const barX = player.x + PLAYER_W / 2 - barW / 2;
+    const barY = Math.max(22, player.y - 26);
+    ctx.fillStyle = '#223300';
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = '#a6ff55';
+    ctx.fillRect(barX, barY, barW * progress, barH);
+    ctx.strokeStyle = '#88cc44';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(barX, barY, barW, barH);
+
+    const flashAlpha = 0.45 + 0.55 * Math.sin(performance.now() * 0.012);
+    ctx.fillStyle = `rgba(200,255,120,${flashAlpha})`;
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText('MASH OUT!', player.x + PLAYER_W / 2, barY - 6);
+  }
 
   // Metal mode indicator
   if (player.metalTimer > 0) {
@@ -785,8 +814,19 @@ function drawDevMenu(ctx) {
   ctx.font = '11px monospace';
   ctx.fillText(S.gear.inventory.length + ' items in inventory', W / 2, gY + 54);
 
+  // Invulnerability toggle
+  const invY = gY + 68;
+  ctx.fillStyle = S.devInvulnerable ? '#223a22' : '#333';
+  ctx.fillRect(dlX, invY, 260, 32);
+  ctx.strokeStyle = S.devInvulnerable ? '#66ff66' : '#666';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(dlX, invY, 260, 32);
+  ctx.fillStyle = S.devInvulnerable ? '#88ff88' : '#aaa';
+  ctx.font = 'bold 12px monospace';
+  ctx.fillText('INVULNERABLE: ' + (S.devInvulnerable ? 'ON' : 'OFF'), W / 2, invY + 21);
+
   // Jump to game over button
-  const goY = gY + 68;
+  const goY = gY + 112;
   ctx.fillStyle = '#442222';
   ctx.fillRect(dlX, goY, 260, 36);
   ctx.strokeStyle = '#ff4444';
@@ -955,8 +995,15 @@ export function handleDevMenuClick(cx, cy) {
     return true;
   }
 
+  // Invulnerability toggle
+  const invBtnY = gY + 68;
+  if (cx >= dlX && cx <= dlX + 260 && cy >= invBtnY && cy <= invBtnY + 32) {
+    S.devInvulnerable = !S.devInvulnerable;
+    return true;
+  }
+
   // Jump to game over
-  const goBtnY = gY + 68;
+  const goBtnY = gY + 112;
   if (cx >= dlX && cx <= dlX + 260 && cy >= goBtnY && cy <= goBtnY + 36) {
     S.devMenuOpen = false;
     S.score = 1337;

@@ -6,11 +6,13 @@ import {
   SNOT_STORM_DURATION,
 } from './constants.js';
 import { random } from './rng.js';
-import { playSound, playNoise, playVoice, playClip, quentinFartClip, deanJamClip, melodicaClip } from './audio.js';
+import { playSound, playNoise, playVoice, playClip, playWillVoice, quentinFartClip, deanJamClip, melodicaClip, stampClip, gargleClip } from './audio.js';
 import {
   evilSprite, evilSpriteLoaded, evilSprite2, evilSprite2Loaded,
   quentinPizzaSprite, quentinPizzaSpriteLoaded,
   deanBossSprite, deanBossSpriteLoaded,
+  willBossSprite, willBossSpriteLoaded,
+  willFishSprites,
   snotCageSprite, snotCageSpriteLoaded,
   flashCanvas, flashCtx,
 } from './sprites.js';
@@ -18,7 +20,7 @@ import { spawnParticles, spawnDamageNumber, addShake } from './effects.js';
 import { rectsOverlap } from './utils.js';
 
 // ============================================================
-// BOSS SYSTEM — EVIL EGGTHONY / QUENTIN PIZZA / DEAN
+// BOSS SYSTEM — EVIL EGGTHONY / QUENTIN PIZZA / DEAN / WILL THE TORTOISE
 // ============================================================
 
 export function isBossRound(r) {
@@ -31,27 +33,31 @@ export function bossAppearance(r) {
 
 export function createBoss(r) {
   const app = bossAppearance(r);
-  const isQP = app >= 3;
-  const isDean = app === 2; // Level 6
+  const isWill = r === 12;
+  const isDean = app === 2 && !isWill; // Level 6 (first time, r===6)
+  const isQP = app >= 3 && !isWill;
   // QP resets scale: qpApp counts from 1 on first QP appearance
   const qpApp = isQP ? app - 2 : app;
-  const scale = isQP ? 1 + (qpApp - 1) * 0.15 : (isDean ? 1.0 : 1 + (app - 1) * 0.2); 
-  const baseH = isQP ? 153 : (isDean ? 160 : 180);
-  const baseW = isQP ? 153 : (isDean ? 100 : Math.round(180 * (818 / 1164))); 
+  const scale = isWill ? 1.0 : (isDean ? 1.0 : (isQP ? 1 + (qpApp - 1) * 0.15 : 1 + (app - 1) * 0.2));
+  const baseH = isWill ? 170 : (isDean ? 160 : (isQP ? 153 : 180));
+  const baseW = isWill ? baseH : (isDean ? 100 : (isQP ? 153 : Math.round(180 * (818 / 1164)))); // Will + QP are square, Dean is narrow, egg uses aspect ratio
   const w = Math.round(baseW * scale);
   const h = Math.round(baseH * scale);
-  const damage = isQP ? Math.min(30, 20 + (qpApp - 1) * 10) : 20 + (app - 1) * 10;
+  const damage = isWill ? 28 : (isQP ? Math.min(30, 20 + (qpApp - 1) * 10) : 20 + (app - 1) * 10);
+  const hp = isWill ? 1300 : (isDean ? 800 : 300 + (app - 1) * 200);
+  const speed = isWill ? 42 : 100 + (app - 1) * 15;
+  const chargeSpeed = isWill ? 440 : (isQP ? 320 + (qpApp - 1) * 20 : 350 + (app - 1) * 30);
   return {
     x: W / 2 - w / 2,
     y: -h - 50,
     w, h,
     vx: 0,
     vy: 0,
-    hp: isDean ? 800 : 300 + (app - 1) * 200, 
-    maxHp: isDean ? 800 : 300 + (app - 1) * 200, 
+    hp: hp,
+    maxHp: hp,
     damage: damage,
-    scoreValue: 1000 + (app - 1) * 500,
-    speed: 100 + (app - 1) * 15,
+    scoreValue: isWill ? 3200 : 1000 + (app - 1) * 500,
+    speed: speed,
     onPlatform: false,
     appearance: app,
     facingRight: true,
@@ -60,9 +66,25 @@ export function createBoss(r) {
     deathTimer: 0,
     state: 'entering',
     attackCooldown: 2.0,
-    chargeSpeed: isQP ? 320 + (qpApp - 1) * 20 : 350 + (app - 1) * 30,
+    chargeSpeed: chargeSpeed,
     chargeTimer: 0,
     chargeDir: 1,
+    spinBounces: 0,
+    willBeamTimer: 0,
+    willBeamTick: 0,
+    willBeamCooldown: 0,
+    willBeamDirX: 1,
+    willBeamDirY: 0,
+    willBeamLen: 320,
+    willBeamHitDelay: 0,
+    willBeamBreakTimer: 0,
+    willBeamMashMeter: 0,
+    willBeamPlayerCaught: false,
+    willMashPrevLeft: false,
+    willMashPrevRight: false,
+    willMashPrevJump: false,
+    willSkyFishTimer: 0.8 + random() * 0.8,
+    willSkyFish: [],
     poundTargetX: 0,
     poundTimer: 0,
     shockwaveTimer: 0,
@@ -71,6 +93,7 @@ export function createBoss(r) {
     shockwaveRadius: 0,
     rage: false,
     animTimer: 0,
+    isWill: isWill,
     isQuentinPizza: isQP,
     isDean: isDean,
     fartCooldown: 0,
@@ -84,11 +107,28 @@ export function updateBoss(dt) {
   const player = S.player;
   const keys = S.keys;
 
-  if (!boss || !S.bossActive) return;
+  if (!boss || !S.bossActive) {
+    if (!gargleClip.paused) {
+      gargleClip.pause();
+      gargleClip.currentTime = 0;
+    }
+    return;
+  }
 
   boss.animTimer += dt * 3;
   boss.flashTimer = Math.max(0, boss.flashTimer - dt);
   S.bossHPBarFlash = Math.max(0, S.bossHPBarFlash - dt);
+  if (boss.isWill) boss.willBeamPlayerCaught = false;
+  const beamGargling = boss.isWill && boss.state === 'will_beam_fire' && !boss.dying && boss.freezeTimer <= 0;
+  if (beamGargling) {
+    if (gargleClip.paused) {
+      gargleClip.currentTime = 0;
+      gargleClip.play().catch(() => {});
+    }
+  } else if (!gargleClip.paused) {
+    gargleClip.pause();
+    gargleClip.currentTime = 0;
+  }
 
   // Death animation
   if (boss.dying) {
@@ -108,8 +148,126 @@ export function updateBoss(dt) {
     boss.rage = true;
     addShake(8, 0.3);
     playSound('bossRoar');
-    spawnParticles(boss.x + boss.w / 2, boss.y + boss.h / 2, '#ff2222', 20, 200, 0.6);
+    if (boss.isWill) playWillVoice(true);
+    spawnParticles(boss.x + boss.w / 2, boss.y + boss.h / 2, boss.isWill ? '#88cc44' : '#ff2222', 20, 200, 0.6);
   }
+
+  const updateWillSkyFish = () => {
+    if (!boss.isWill) return;
+    if (!Array.isArray(boss.willSkyFish)) boss.willSkyFish = [];
+    const fishPool = willFishSprites;
+    const maxFish = 90;
+    const spawnActive = !boss.dying && boss.state !== 'entering';
+
+    boss.willSkyFishTimer -= dt;
+    if (spawnActive && boss.willSkyFishTimer <= 0) {
+      const baseInterval = boss.rage ? 0.5 : 0.7;
+      boss.willSkyFishTimer = baseInterval + random() * 0.7;
+      const spriteIndex = fishPool.length > 0 ? Math.floor(random() * fishPool.length) : -1;
+      const fishSprite = spriteIndex >= 0 ? fishPool[spriteIndex] : null;
+      const w = fishSprite ? (20 + random() * 16) : (18 + random() * 8);
+      const h = fishSprite
+        ? w * ((fishSprite.naturalHeight || fishSprite.height || w) / (fishSprite.naturalWidth || fishSprite.width || w))
+        : w * 0.55;
+      boss.willSkyFish.push({
+        x: PLATFORM_X + 14 + random() * (PLATFORM_W - 28),
+        y: -40 - random() * 120,
+        vx: (random() - 0.5) * 28,
+        vy: 70 + random() * 65,
+        rot: random() * Math.PI * 2,
+        rotV: (random() - 0.5) * 2.8,
+        w, h,
+        spriteIndex: spriteIndex,
+        landed: false,
+        hitPlayer: false,
+        damage: Math.max(4, Math.round(boss.damage * 0.3)),
+      });
+    }
+
+    const getSupportY = (fish) => {
+      let supportY = PLATFORM_Y - fish.h * 0.42;
+      for (let i = 0; i < boss.willSkyFish.length; i++) {
+        const other = boss.willSkyFish[i];
+        if (!other || other === fish || !other.landed) continue;
+        const xDist = Math.abs(fish.x - other.x);
+        const overlapX = (fish.w + other.w) * 0.32;
+        if (xDist > overlapX) continue;
+        const stackedY = other.y - (fish.h + other.h) * 0.34;
+        if (stackedY < supportY) supportY = stackedY;
+      }
+      return supportY;
+    };
+
+    const pcx = player.x + PLAYER_W / 2;
+    const pcy = player.y + PLAYER_H / 2;
+    for (let i = boss.willSkyFish.length - 1; i >= 0; i--) {
+      const fish = boss.willSkyFish[i];
+      if (!fish) continue;
+
+      if (!fish.landed) {
+        fish.vy += GRAVITY * 0.28 * dt;
+        if (fish.vy > 230) fish.vy = 230;
+        fish.x += fish.vx * dt;
+        fish.y += fish.vy * dt;
+        fish.rot += fish.rotV * dt;
+
+        if (fish.x < PLATFORM_X + fish.w * 0.35) {
+          fish.x = PLATFORM_X + fish.w * 0.35;
+          fish.vx = Math.abs(fish.vx) * 0.25;
+        } else if (fish.x > PLATFORM_X + PLATFORM_W - fish.w * 0.35) {
+          fish.x = PLATFORM_X + PLATFORM_W - fish.w * 0.35;
+          fish.vx = -Math.abs(fish.vx) * 0.25;
+        }
+
+        const supportY = getSupportY(fish);
+        if (fish.y >= supportY) {
+          fish.y = supportY;
+          fish.landed = true;
+          fish.vx = 0;
+          fish.vy = 0;
+          fish.rotV = 0;
+          fish.rot = (random() - 0.5) * 0.45;
+          if (random() < 0.18) spawnParticles(fish.x, fish.y, '#8fbf58', 2, 40, 0.15);
+        } else if (!fish.hitPlayer && rectsOverlap(
+            player.x, player.y, PLAYER_W, PLAYER_H,
+            fish.x - fish.w * 0.45, fish.y - fish.h * 0.45, fish.w * 0.9, fish.h * 0.9
+        )) {
+          fish.hitPlayer = true;
+          if (!S.devInvulnerable && player.iframes <= 0 && player.wingsTimer <= 0) {
+            if (player.metalTimer > 0) {
+              fish.vx *= -0.2;
+              fish.vy = -Math.abs(fish.vy) * 0.2;
+              spawnParticles(pcx, pcy, '#aaccff', 5, 90, 0.2);
+              playSound('hit');
+            } else {
+              const hitDmg = fish.damage;
+              const knockDir = Math.sign(pcx - fish.x) || 1;
+              player.hp -= hitDmg;
+              player.iframes = Math.max(player.iframes, 0.35);
+              player.vx = knockDir * 220;
+              player.vy = -180;
+              player.knockbackTimer = 0.16;
+              player.flashTimer = 0.12;
+              spawnDamageNumber(pcx, player.y, hitDmg, '#b8df72');
+              addShake(4, 0.08);
+              playSound('hurt');
+            }
+          }
+        }
+      }
+    }
+
+    if (boss.willSkyFish.length > maxFish) {
+      const overflow = boss.willSkyFish.length - maxFish;
+      for (let i = 0; i < overflow; i++) {
+        const landedIndex = boss.willSkyFish.findIndex((f) => f && f.landed);
+        if (landedIndex >= 0) boss.willSkyFish.splice(landedIndex, 1);
+        else boss.willSkyFish.shift();
+      }
+    }
+  };
+
+  updateWillSkyFish();
 
   // Freeze
   if (boss.freezeTimer > 0) {
@@ -172,10 +330,61 @@ export function updateBoss(dt) {
   const rageMult = boss.rage ? 1.3 : 1.0;
   const cooldownMult = boss.rage ? 0.5 : 1.0;
 
+  if (boss.isWill && boss.willBeamCooldown > 0) {
+    boss.willBeamCooldown = Math.max(0, boss.willBeamCooldown - dt);
+  }
+  if (boss.isWill && boss.willBeamBreakTimer > 0) {
+    boss.willBeamBreakTimer = Math.max(0, boss.willBeamBreakTimer - dt);
+  }
+
   const pcx = player.x + PLAYER_W / 2;
   const pcy = player.y + PLAYER_H / 2;
   const bcx = boss.x + boss.w / 2;
   const bcy = boss.y + boss.h / 2;
+  const getWillMouthPos = () => ({
+    x: boss.x + (boss.facingRight ? boss.w * 0.64 : boss.w * 0.36),
+    y: boss.y + boss.h * 0.36
+  });
+  const triggerWillStompImpact = () => {
+    boss.shockwaveActive = true;
+    boss.shockwaveX = boss.x + boss.w / 2;
+    boss.shockwaveRadius = 0;
+    boss.shockwaveTimer = 0.4;
+
+    addShake(13, 0.32);
+    spawnParticles(boss.x + boss.w / 2, PLATFORM_Y, '#a4c860', 28, 300, 0.5);
+    playClip(stampClip);
+    playNoise(0.25, 0.2);
+    if (random() < 0.8) playWillVoice();
+
+    const playerFeetY = player.y + PLAYER_H;
+    const onMainStage = player.onGround && playerFeetY >= PLATFORM_Y - 4;
+    // Horizontal splash only applies near main-stage height, not on high floating platforms.
+    const nearMainStageHeight = playerFeetY >= PLATFORM_Y - 48;
+    const closeHoriz = nearMainStageHeight && Math.abs(pcx - (boss.x + boss.w / 2)) <= 120;
+    const stompHitsPlayer = onMainStage || closeHoriz;
+    if (!stompHitsPlayer || player.iframes > 0 || player.wingsTimer > 0) return;
+
+    const knockDir = Math.sign(pcx - (boss.x + boss.w / 2)) || 1;
+    if (player.metalTimer > 0) {
+      player.vx = knockDir * 400;
+      player.vy = -300;
+      spawnParticles(pcx, pcy, '#aaccff', 6, 120, 0.3);
+      playSound('hit');
+    } else {
+      player.hp -= boss.damage;
+      player.iframes = IFRAME_DURATION;
+      player.vx = knockDir * 400;
+      player.vy = -250;
+      player.knockbackTimer = 0.3;
+      player.airJumps = 1;
+      player.flashTimer = 0.15;
+      spawnDamageNumber(pcx, player.y, boss.damage, '#ff4444');
+      addShake(6, 0.15);
+      playSound('hurt');
+      if (random() < 0.3) playVoice('bad');
+    }
+  };
 
   switch (boss.state) {
     case 'entering': {
@@ -188,8 +397,8 @@ export function updateBoss(dt) {
         boss.onPlatform = true;
         S.bossEntering = false;
         addShake(15, 0.4);
-        spawnParticles(boss.x + boss.w / 2, PLATFORM_Y, '#ffaa44', 30, 250, 0.6);
-        spawnParticles(boss.x + boss.w / 2, PLATFORM_Y, '#ff6622', 20, 200, 0.5);
+        spawnParticles(boss.x + boss.w / 2, PLATFORM_Y, boss.isWill ? '#a4c860' : '#ffaa44', 30, 250, 0.6);
+        spawnParticles(boss.x + boss.w / 2, PLATFORM_Y, boss.isWill ? '#5d7a29' : '#ff6622', 20, 200, 0.5);
         playSound('bossSlam');
         playNoise(0.2, 0.25);
         // QP immediately farts on landing
@@ -203,6 +412,7 @@ export function updateBoss(dt) {
         } else {
           boss.state = 'idle';
           boss.attackCooldown = 1.5;
+          if (boss.isWill) playWillVoice(true);
         }
       }
       break;
@@ -234,6 +444,20 @@ export function updateBoss(dt) {
           boss.state = 'sonic_boom_windup';
           boss.chargeTimer = 0.8;
           boss.vx = 0;
+        } else if (boss.isWill) {
+          const useBeam = boss.willBeamCooldown <= 0 && random() < (boss.rage ? 0.45 : 0.35);
+          if (useBeam) {
+            boss.state = 'will_beam_windup';
+            boss.willBeamTimer = boss.rage ? 0.45 : 0.6;
+            boss.vx = 0;
+            if (random() < 0.7) playWillVoice();
+          } else {
+            boss.state = 'will_stomp_windup';
+            boss.poundTimer = boss.rage ? 0.45 : 0.55;
+            boss.vx = 0;
+            if (random() < 0.65) playWillVoice();
+          }
+        // QP: chance to fart instead of normal attack
         } else if (boss.isQuentinPizza && boss.fartCooldown <= 0 && random() < 0.35) {
           boss.state = 'fart_windup';
           boss.fartTimer = 0.8;
@@ -263,7 +487,7 @@ export function updateBoss(dt) {
         boss.state = 'sonic_boom_release';
         boss.chargeTimer = 0.5;
         playClip(melodicaClip); // Play the melodica for the sonic impact
-        
+
         // Spawn sonic boom projectile/shockwave
         const dir = boss.facingRight ? 1 : -1;
         S.enemyProjectiles.push({
@@ -289,6 +513,223 @@ export function updateBoss(dt) {
       if (boss.chargeTimer <= 0) {
         boss.state = 'idle';
         boss.attackCooldown = 2.0 * cooldownMult;
+      }
+      break;
+    }
+
+    case 'will_beam_windup': {
+      boss.vx = 0;
+      const mouth = getWillMouthPos();
+      const toPlayerX = pcx - mouth.x;
+      const toPlayerY = pcy - mouth.y;
+      const toPlayerLen = Math.hypot(toPlayerX, toPlayerY);
+      if (toPlayerLen > 1) {
+        boss.willBeamDirX = toPlayerX / toPlayerLen;
+        boss.willBeamDirY = toPlayerY / toPlayerLen;
+        // Extend beam to the screen edge
+        const edgeDists = [];
+        if (boss.willBeamDirX > 0.01) edgeDists.push((W - mouth.x) / boss.willBeamDirX);
+        if (boss.willBeamDirX < -0.01) edgeDists.push(-mouth.x / boss.willBeamDirX);
+        if (boss.willBeamDirY > 0.01) edgeDists.push((H - mouth.y) / boss.willBeamDirY);
+        if (boss.willBeamDirY < -0.01) edgeDists.push(-mouth.y / boss.willBeamDirY);
+        const edgeDist = edgeDists.length > 0 ? Math.min(...edgeDists) : 500;
+        boss.willBeamLen = Math.max(200, edgeDist + 40);
+      }
+      boss.facingRight = toPlayerX >= 0;
+      boss.willBeamMashMeter = Math.max(0, boss.willBeamMashMeter - dt * 0.6);
+      boss.willBeamTimer -= dt;
+      if (boss.willBeamTimer <= 0) {
+        boss.state = 'will_beam_fire';
+        boss.willBeamTimer = boss.rage ? 1.8 : 1.5;
+        boss.willBeamHitDelay = 0.16;
+        boss.willBeamTick = 0;
+        boss.willBeamCooldown = boss.rage ? 3.8 : 4.8;
+        boss.willBeamBreakTimer = 0;
+        boss.willBeamMashMeter = 0;
+        boss.willMashPrevLeft = false;
+        boss.willMashPrevRight = false;
+        boss.willMashPrevJump = false;
+        playWillVoice(true);
+      }
+      break;
+    }
+
+    case 'will_beam_fire': {
+      boss.vx = 0;
+      boss.willBeamTimer -= dt;
+      boss.willBeamHitDelay = Math.max(0, boss.willBeamHitDelay - dt);
+      boss.willBeamTick -= dt;
+
+      const mouth = getWillMouthPos();
+      boss.facingRight = boss.willBeamDirX >= 0;
+
+      const beamEndX = mouth.x + boss.willBeamDirX * boss.willBeamLen;
+      const beamEndY = mouth.y + boss.willBeamDirY * boss.willBeamLen;
+      const segDx = beamEndX - mouth.x;
+      const segDy = beamEndY - mouth.y;
+      const segLenSq = segDx * segDx + segDy * segDy;
+      const t = segLenSq > 0
+        ? Math.max(0, Math.min(1, ((pcx - mouth.x) * segDx + (pcy - mouth.y) * segDy) / segLenSq))
+        : 0;
+      const closestX = mouth.x + segDx * t;
+      const closestY = mouth.y + segDy * t;
+      const distToBeam = Math.hypot(pcx - closestX, pcy - closestY);
+      const inBeam = boss.willBeamHitDelay <= 0 && distToBeam <= 42;
+      boss.willBeamPlayerCaught = inBeam;
+
+      const leftHeld = !!(keys['a'] || keys['arrowleft']);
+      const rightHeld = !!(keys['d'] || keys['arrowright']);
+      const jumpHeld = !!(keys[' '] || keys['arrowup'] || keys['w']);
+      const leftTap = leftHeld && !boss.willMashPrevLeft;
+      const rightTap = rightHeld && !boss.willMashPrevRight;
+      const jumpTap = jumpHeld && !boss.willMashPrevJump;
+      if (leftTap || rightTap || jumpTap) {
+        boss.willBeamMashMeter += (leftTap || rightTap ? 0.22 : 0) + (jumpTap ? 0.16 : 0);
+      }
+      boss.willMashPrevLeft = leftHeld;
+      boss.willMashPrevRight = rightHeld;
+      boss.willMashPrevJump = jumpHeld;
+      boss.willBeamMashMeter = Math.max(0, boss.willBeamMashMeter - dt * 0.75);
+      if (boss.willBeamMashMeter >= 1.0 && boss.willBeamBreakTimer <= 0) {
+        boss.willBeamBreakTimer = 0.45;
+        boss.willBeamMashMeter = 0;
+        const awayX = pcx - mouth.x;
+        const awayY = pcy - mouth.y;
+        const awayLen = Math.hypot(awayX, awayY) || 1;
+        player.vx += (awayX / awayLen) * 240;
+        player.vy += (awayY / awayLen) * 220;
+        player.iframes = Math.max(player.iframes, 0.18);
+        spawnParticles(pcx, pcy, '#b6ff72', 8, 140, 0.25);
+      }
+
+      if (inBeam && boss.willBeamBreakTimer <= 0) {
+        const pullX = mouth.x - pcx;
+        const pullY = mouth.y - pcy;
+        const pullLen = Math.hypot(pullX, pullY) || 1;
+        const resist = Math.min(0.7, boss.willBeamMashMeter * 0.6);
+        const pullScale = Math.max(0.45, 1 - resist);
+        player.vx += (pullX / pullLen) * 1050 * pullScale * dt;
+        player.vy += (pullY / pullLen) * 860 * pullScale * dt;
+
+        if (player.iframes <= 0 && player.wingsTimer <= 0 && player.metalTimer <= 0 && boss.willBeamTick <= 0) {
+          const beamDmg = Math.max(2, Math.round(boss.damage * 0.2));
+          player.hp -= beamDmg;
+          player.iframes = 0.2;
+          player.flashTimer = 0.08;
+          spawnDamageNumber(pcx, player.y, beamDmg, '#99dd66');
+          playSound('hurt');
+          boss.willBeamTick = 0.22;
+        }
+
+        if (random() < 0.12) {
+          spawnParticles(pcx, pcy, '#88cc55', 1, 80, 0.2);
+        }
+      }
+
+      if (boss.willBeamTimer <= 0) {
+        boss.state = 'will_beam_recover';
+        boss.willBeamTimer = boss.rage ? 0.22 : 0.32;
+        boss.willBeamBreakTimer = 0;
+        boss.willMashPrevLeft = false;
+        boss.willMashPrevRight = false;
+        boss.willMashPrevJump = false;
+      }
+      break;
+    }
+
+    case 'will_beam_recover': {
+      boss.vx = 0;
+      boss.willBeamTimer -= dt;
+      if (boss.willBeamTimer <= 0) {
+        boss.state = 'idle';
+        boss.attackCooldown = 1.0 * cooldownMult;
+      }
+      break;
+    }
+
+    case 'will_stomp_windup': {
+      boss.poundTimer -= dt;
+      boss.vx = 0;
+      if (boss.poundTimer <= 0) {
+        boss.state = 'will_stomp_hop';
+        boss.vy = boss.rage ? -280 : -240;
+        boss.onPlatform = false;
+      }
+      break;
+    }
+
+    case 'will_stomp_hop': {
+      boss.vx = 0;
+      boss.vy += GRAVITY * 1.8 * dt;
+      boss.y += boss.vy * dt;
+      if (boss.y + boss.h >= PLATFORM_Y) {
+        boss.y = PLATFORM_Y - boss.h;
+        boss.vy = 0;
+        boss.onPlatform = true;
+        triggerWillStompImpact();
+        boss.state = 'will_stomp_recover';
+        boss.poundTimer = boss.rage ? 0.25 : 0.35;
+      }
+      break;
+    }
+
+    case 'will_stomp_recover': {
+      boss.poundTimer -= dt;
+      boss.vx = 0;
+      if (boss.poundTimer <= 0) {
+        boss.state = 'idle';
+        boss.attackCooldown = 1.1 * cooldownMult;
+      }
+      break;
+    }
+
+    case 'shell_windup': {
+      boss.chargeTimer -= dt;
+      boss.vx = 0;
+      if (boss.chargeTimer <= 0) {
+        boss.state = 'shell_spin';
+        boss.chargeTimer = boss.rage ? 1.9 : 1.5;
+        boss.spinBounces = boss.rage ? 2 : 1;
+        playSound('bossRoar');
+        playWillVoice(true);
+      }
+      break;
+    }
+
+    case 'shell_spin': {
+      boss.vx = boss.chargeDir * boss.chargeSpeed * rageMult * 1.15;
+      boss.x += boss.vx * dt;
+      boss.chargeTimer -= dt;
+
+      if (random() < 0.35) {
+        spawnParticles(boss.x + boss.w / 2, boss.y + boss.h * 0.8, '#77963d', 1, 120, 0.15);
+      }
+
+      let bounced = false;
+      if (boss.x < PLATFORM_X) {
+        boss.x = PLATFORM_X;
+        bounced = true;
+      } else if (boss.x + boss.w > PLATFORM_X + PLATFORM_W) {
+        boss.x = PLATFORM_X + PLATFORM_W - boss.w;
+        bounced = true;
+      }
+
+      if (bounced) {
+        if (boss.spinBounces > 0) {
+          boss.spinBounces -= 1;
+          boss.chargeDir *= -1;
+          addShake(4, 0.08);
+          playSound('bossSlam');
+          if (random() < 0.75) playWillVoice();
+        } else {
+          boss.chargeTimer = 0;
+        }
+      }
+
+      if (boss.chargeTimer <= 0) {
+        boss.state = 'idle';
+        boss.attackCooldown = 1.4 * cooldownMult;
+        boss.vx = 0;
       }
       break;
     }
@@ -359,12 +800,14 @@ export function updateBoss(dt) {
         boss.shockwaveTimer = 0.4;
 
         addShake(12, 0.3);
-        spawnParticles(boss.x + boss.w / 2, PLATFORM_Y, '#ffaa44', 25, 300, 0.5);
+        spawnParticles(boss.x + boss.w / 2, PLATFORM_Y, boss.isWill ? '#a4c860' : '#ffaa44', 25, 300, 0.5);
         playSound('bossSlam');
         playNoise(0.25, 0.2);
+        if (boss.isWill && random() < 0.8) playWillVoice();
 
         const shockDist = Math.abs(pcx - (boss.x + boss.w / 2));
-        if (shockDist < 120 && player.iframes <= 0 && player.wingsTimer <= 0) {
+        const stompHitsPlayer = boss.isWill ? player.onGround : (shockDist < 120);
+        if (stompHitsPlayer && player.iframes <= 0 && player.wingsTimer <= 0) {
           if (player.metalTimer > 0) {
             const knockDir = Math.sign(pcx - (boss.x + boss.w / 2)) || 1;
             player.vx = knockDir * 400;
@@ -456,7 +899,12 @@ export function updateBoss(dt) {
 
   // Contact damage to player
   if (boss.state !== 'entering' && !boss.dying && player.iframes <= 0) {
-    if (rectsOverlap(player.x, player.y, PLAYER_W, PLAYER_H, boss.x, boss.y, boss.w, boss.h)) {
+    // Will uses a tighter contact box so jumping over the top is less punishing.
+    const contactX = boss.isWill ? boss.x + boss.w * 0.22 : boss.x;
+    const contactY = boss.isWill ? boss.y + boss.h * 0.24 : boss.y;
+    const contactW = boss.isWill ? boss.w * 0.56 : boss.w;
+    const contactH = boss.isWill ? boss.h * 0.74 : boss.h;
+    if (rectsOverlap(player.x, player.y, PLAYER_W, PLAYER_H, contactX, contactY, contactW, contactH)) {
       if (player.metalTimer > 0) {
         const knockDir = Math.sign(boss.x + boss.w / 2 - pcx) || 1;
         damageBoss(40, knockDir * 100, -50);
@@ -464,15 +912,17 @@ export function updateBoss(dt) {
         playSound('hit');
         player.iframes = 0.2;
       } else {
+        const touchDamage = (boss.isWill && boss.state === 'shell_spin') ? Math.round(boss.damage * 1.35) : boss.damage;
+        const contactKnockback = (boss.isWill && boss.state === 'shell_spin') ? CONTACT_KNOCKBACK * 1.2 : CONTACT_KNOCKBACK;
         const knockDir = Math.sign(pcx - (boss.x + boss.w / 2)) || 1;
-        player.hp -= boss.damage;
+        player.hp -= touchDamage;
         player.iframes = IFRAME_DURATION;
-        player.vx = knockDir * CONTACT_KNOCKBACK;
+        player.vx = knockDir * contactKnockback;
         player.vy = -380;
         player.knockbackTimer = 0.3;
         player.airJumps = 1; // reset air jump so player can escape knockback
         player.flashTimer = 0.15;
-        spawnDamageNumber(pcx, player.y, boss.damage, '#ff4444');
+        spawnDamageNumber(pcx, player.y, touchDamage, '#ff4444');
         addShake(6, 0.15);
         playSound('hurt');
         if (random() < 0.3) playVoice('bad');
@@ -508,13 +958,18 @@ export function updateBoss(dt) {
 export function damageBoss(damage, knockX, knockY) {
   const boss = S.boss;
   if (!boss || boss.dying) return;
-  boss.hp -= damage;
+  let dealtDamage = damage;
+  // Shell spin grants heavy damage reduction to emphasize tortoise armor.
+  if (boss.isWill && boss.state === 'shell_spin') {
+    dealtDamage = Math.max(1, Math.round(damage * 0.45));
+  }
+  boss.hp -= dealtDamage;
   boss.flashTimer = 0.1;
   S.bossHPBarFlash = 0.15;
   // Reduced knockback (boss is heavy)
   boss.x += knockX * 0.3 * (1 / 60);
 
-  spawnDamageNumber(boss.x + boss.w / 2, boss.y, damage, '#ffff44');
+  spawnDamageNumber(boss.x + boss.w / 2, boss.y, dealtDamage, '#ffff44');
   playSound('hit');
 
   if (boss.hp <= 0) {
@@ -601,11 +1056,14 @@ export function drawBoss() {
     return;
   }
 
-  // Aura (green for QP, red for evil eggthony, cyan for Dean)
+  // Aura (olive for Will, green for QP, red for evil eggthony, cyan for Dean)
   const auraSize = boss.rage ? 1.4 : 1.15;
   const auraAlpha = boss.rage ? (0.25 + 0.15 * Math.sin(performance.now() * 0.01)) : 0.1;
   const auraGrad = ctx.createRadialGradient(bcx, bcy, boss.w * 0.3, bcx, bcy, boss.w * auraSize);
-  if (boss.isQuentinPizza) {
+  if (boss.isWill) {
+    auraGrad.addColorStop(0, `rgba(125,170,60,${auraAlpha})`);
+    auraGrad.addColorStop(1, 'rgba(125,170,60,0)');
+  } else if (boss.isQuentinPizza) {
     auraGrad.addColorStop(0, `rgba(80,200,20,${auraAlpha})`);
     auraGrad.addColorStop(1, 'rgba(80,200,20,0)');
   } else if (boss.isDean) {
@@ -619,7 +1077,7 @@ export function drawBoss() {
   ctx.fillRect(bcx - boss.w * auraSize, bcy - boss.h * auraSize, boss.w * auraSize * 2, boss.h * auraSize * 2);
 
   // Fart windup telegraph
-  if (boss.state === 'fart_windup') {
+  if (boss.isQuentinPizza && boss.state === 'fart_windup') {
     const fartAlpha = 0.3 + 0.2 * Math.sin(performance.now() * 0.02);
     ctx.fillStyle = `rgba(80,200,30,${fartAlpha})`;
     ctx.beginPath();
@@ -627,16 +1085,115 @@ export function drawBoss() {
     ctx.fill();
   }
 
-  // Charge telegraph arrows
-  if (boss.state === 'charge_windup') {
-    const arrowAlpha = 0.5 + 0.5 * Math.sin(performance.now() * 0.015);
-    ctx.fillStyle = `rgba(255,60,20,${arrowAlpha})`;
-    ctx.font = 'bold 30px monospace';
-    ctx.textAlign = 'center';
-    if (boss.chargeDir > 0) {
-      ctx.fillText('>>>', bcx + boss.w, bcy);
+  if (boss.isWill && boss.state === 'will_stomp_windup') {
+    const stompAlpha = 0.35 + 0.25 * Math.sin(performance.now() * 0.03);
+    ctx.strokeStyle = `rgba(180,220,110,${stompAlpha})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(bcx, PLATFORM_Y, 95, Math.PI, 0);
+    ctx.stroke();
+  }
+
+  const drawWillSkyFish = () => {
+    if (!boss.isWill || !Array.isArray(boss.willSkyFish) || boss.willSkyFish.length <= 0) return;
+    const fishPool = willFishSprites;
+    const fishToDraw = boss.willSkyFish.slice().sort((a, b) => a.y - b.y);
+
+    for (const fish of fishToDraw) {
+      const drawW = fish.w;
+      const drawH = fish.h;
+      const fishSprite = fish.spriteIndex >= 0 ? fishPool[fish.spriteIndex % fishPool.length] : null;
+      ctx.save();
+      ctx.translate(fish.x, fish.y);
+      ctx.rotate(fish.rot || 0);
+      ctx.globalAlpha = fish.landed ? 0.92 : 1;
+      if (fishSprite) {
+        ctx.drawImage(fishSprite, -drawW * 0.5, -drawH * 0.5, drawW, drawH);
+      } else {
+        ctx.fillStyle = fish.landed ? '#89b34c' : '#9cca58';
+        ctx.beginPath();
+        ctx.ellipse(0, 0, drawW * 0.5, drawH * 0.45, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  };
+
+  const drawWillBeamFish = () => {
+    if (!(boss.isWill && (boss.state === 'will_beam_windup' || boss.state === 'will_beam_fire'))) return;
+    const mouthX = boss.x + (boss.facingRight ? boss.w * 0.64 : boss.w * 0.36);
+    const mouthY = boss.y + boss.h * 0.36;
+    const dirX = boss.willBeamDirX || (boss.facingRight ? 1 : -1);
+    const dirY = boss.willBeamDirY || 0;
+    const beamLen = boss.willBeamLen || 320;
+    const beamAngle = Math.atan2(dirY, dirX);
+    const pulse = 0.55 + 0.45 * Math.sin(performance.now() * 0.02);
+    const fishPool = willFishSprites;
+
+    ctx.save();
+    ctx.translate(mouthX, mouthY);
+    ctx.rotate(beamAngle);
+    if (fishPool.length <= 0) {
+      ctx.fillStyle = `rgba(120,200,70,0.15)`;
+      ctx.beginPath();
+      ctx.arc(0, 0, 10 + pulse * 5, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (boss.state === 'will_beam_windup') {
+      for (let i = 0; i < 14; i++) {
+        const fish = fishPool[i % fishPool.length];
+        const orbitR = 8 + (i % 5) * 2 + pulse * 6;
+        const orbitA = performance.now() * 0.004 + i * 0.45;
+        const fx = Math.cos(orbitA) * orbitR;
+        const fy = Math.sin(orbitA) * orbitR * 0.65;
+        const w = 16 + (i % 3) * 4;
+        const h = w * (fish.naturalHeight / fish.naturalWidth);
+        ctx.drawImage(fish, fx - w * 0.55, fy - h * 0.5, w, h);
+      }
     } else {
-      ctx.fillText('<<<', bcx - boss.w, bcy);
+      // Dense, overlapping fish copies packed across the full beam.
+      const spacing = 8;
+      const lanes = 5;
+      const laneOffsets = [-24, -12, 0, 12, 24];
+      const fishCount = Math.ceil(beamLen / spacing) + 4;
+      const flow = (performance.now() * 0.09) % spacing;
+
+      ctx.globalAlpha = 0.94;
+      for (let lane = 0; lane < lanes; lane++) {
+        const laneY = laneOffsets[lane];
+        for (let i = 0; i < fishCount; i++) {
+          const fish = fishPool[(i + lane * 3) % fishPool.length];
+          const x = i * spacing - flow - 36 + lane * 1.5;
+          if (x < -70 || x > beamLen + 24) continue;
+          const y = laneY + Math.sin((i + lane * 0.8) * 0.7 + performance.now() * 0.01) * 2.5;
+          const w = 20 + ((i + lane) % 4) * 5;
+          const h = w * (fish.naturalHeight / fish.naturalWidth);
+          ctx.save();
+          ctx.translate(x, y);
+          // Fish travel toward Will's mouth (negative local X), so flip to face that way.
+          ctx.scale(-1, 1);
+          ctx.drawImage(fish, -w * 0.45, -h * 0.5, w, h);
+          ctx.restore();
+        }
+      }
+      ctx.globalAlpha = 1;
+    }
+    ctx.restore();
+  };
+
+  // Charge telegraph arrows
+  if (boss.state === 'charge_windup' || boss.state === 'shell_windup') {
+    const arrowAlpha = 0.5 + 0.5 * Math.sin(performance.now() * 0.015);
+    ctx.fillStyle = boss.state === 'shell_windup' ? `rgba(120,180,60,${arrowAlpha})` : `rgba(255,60,20,${arrowAlpha})`;
+    ctx.font = boss.state === 'shell_windup' ? 'bold 20px monospace' : 'bold 30px monospace';
+    ctx.textAlign = 'center';
+    if (boss.state === 'shell_windup') {
+      ctx.fillText('SPIN!', bcx, boss.y - 8);
+    } else {
+      if (boss.chargeDir > 0) {
+        ctx.fillText('>>>', bcx + boss.w, bcy);
+      } else {
+        ctx.fillText('<<<', bcx - boss.w, bcy);
+      }
     }
   }
 
@@ -650,13 +1207,15 @@ export function drawBoss() {
     ctx.fill();
   }
 
-  // Draw sprite
-  const useQP = boss.isQuentinPizza && quentinPizzaSpriteLoaded;
-  const useDean = boss.isDean && deanBossSpriteLoaded;
-  const useSprite2 = !useQP && !useDean && boss.appearance >= 2 && evilSprite2Loaded;
-  const bossSprite = useQP ? quentinPizzaSprite : (useDean ? deanBossSprite : (useSprite2 ? evilSprite2 : evilSprite));
-  
-  if (useQP || useDean || useSprite2 || evilSpriteLoaded) {
+  drawWillSkyFish();
+
+  // Draw sprite — Will -> willBossSprite, Dean -> deanBossSprite, QP -> quentinPizzaSprite, app>=2 -> evilSprite2, else evilSprite
+  const useWill = boss.isWill && willBossSpriteLoaded;
+  const useDean = !useWill && boss.isDean && deanBossSpriteLoaded;
+  const useQP = !useWill && !useDean && boss.isQuentinPizza && quentinPizzaSpriteLoaded;
+  const useSprite2 = !useWill && !useDean && !useQP && boss.appearance >= 2 && evilSprite2Loaded;
+  const bossSprite = useWill ? willBossSprite : (useDean ? deanBossSprite : (useQP ? quentinPizzaSprite : (useSprite2 ? evilSprite2 : evilSprite)));
+  if (useWill || useDean || useQP || useSprite2 || evilSpriteLoaded) {
     ctx.save();
     if (!boss.facingRight) {
       ctx.translate(bcx, bcy);
@@ -675,22 +1234,43 @@ export function drawBoss() {
     if (boss.rage) {
       ctx.globalCompositeOperation = 'source-atop';
       const tint = 0.15 + 0.1 * Math.sin(performance.now() * 0.008);
-      ctx.fillStyle = boss.isQuentinPizza ? `rgba(80,200,20,${tint})` : (boss.isDean ? `rgba(0,255,255,${tint})` : `rgba(255,0,0,${tint})`);
+      ctx.fillStyle = boss.isWill ? `rgba(130,180,60,${tint})` : (boss.isQuentinPizza ? `rgba(80,200,20,${tint})` : (boss.isDean ? `rgba(0,255,255,${tint})` : `rgba(255,0,0,${tint})`));
       ctx.fillRect(boss.x, boss.y, boss.w, boss.h);
     }
 
     ctx.restore();
   } else {
-    ctx.fillStyle = boss.flashTimer > 0 ? '#ffffff' : (boss.rage ? '#cc2222' : '#882222');
+    if (boss.flashTimer > 0) {
+      ctx.fillStyle = '#ffffff';
+    } else if (boss.isWill) {
+      ctx.fillStyle = boss.rage ? '#91b651' : '#5f7b34';
+    } else {
+      ctx.fillStyle = boss.rage ? '#cc2222' : '#882222';
+    }
     ctx.beginPath();
     ctx.ellipse(bcx, bcy + boss.h * 0.1, boss.w / 2, boss.h / 2, 0, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#ff0000';
+    ctx.fillStyle = boss.isWill ? '#1a230e' : '#ff0000';
     const eyeOff = boss.facingRight ? boss.w * 0.1 : -boss.w * 0.1;
     const eyeSize = Math.max(3, boss.w * 0.08);
     ctx.fillRect(bcx + eyeOff - eyeSize * 1.5, bcy - boss.h * 0.15, eyeSize, eyeSize);
     ctx.fillRect(bcx + eyeOff + eyeSize * 0.5, bcy - boss.h * 0.15, eyeSize, eyeSize);
   }
+
+  // Draw fish beam after Will sprite so it can occlude his face.
+  drawWillBeamFish();
+
+  if (boss.isWill && boss.state === 'shell_spin') {
+    const ringAlpha = 0.2 + 0.2 * Math.sin(performance.now() * 0.03);
+    ctx.strokeStyle = `rgba(180,220,110,${ringAlpha})`;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.ellipse(bcx, bcy + boss.h * 0.1, boss.w * 0.6, boss.h * 0.35, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // (Freeze visual now handled by snot cage early return above)
+
 
   // Shockwave ring
   if (boss.shockwaveActive) {
@@ -725,7 +1305,7 @@ export function drawBossHPBar() {
   ctx.fillRect(barX, barY, barW, barH);
 
   const hpRatio = Math.max(0, boss.hp / boss.maxHp);
-  const barColor = boss.rage ? '#ff2222' : '#cc2222';
+  const barColor = boss.isWill ? (boss.rage ? '#9ecb58' : '#6c8f3a') : (boss.rage ? '#ff2222' : '#cc2222');
   ctx.fillStyle = barColor;
   ctx.fillRect(barX, barY, barW * hpRatio, barH);
 
@@ -734,14 +1314,15 @@ export function drawBossHPBar() {
     ctx.fillRect(barX, barY, barW * hpRatio, barH);
   }
 
-  ctx.strokeStyle = boss.rage ? '#ff4444' : '#882222';
+  ctx.strokeStyle = boss.isWill ? (boss.rage ? '#b9e86d' : '#87ad50') : (boss.rage ? '#ff4444' : '#882222');
   ctx.lineWidth = 2;
   ctx.strokeRect(barX, barY, barW, barH);
 
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 11px monospace';
   ctx.textAlign = 'left';
-  ctx.fillText(boss.isQuentinPizza ? 'QUENTIN PIZZA' : (boss.isDean ? 'DEAN' : 'EVIL EGGTHONY'), barX + 6, barY + 13);
+  const bossName = boss.isWill ? 'WILL THE TORTOISE' : (boss.isQuentinPizza ? 'QUENTIN PIZZA' : (boss.isDean ? 'DEAN' : 'EVIL EGGTHONY'));
+  ctx.fillText(bossName, barX + 6, barY + 13);
 
   ctx.textAlign = 'right';
   ctx.fillStyle = '#ffcc44';

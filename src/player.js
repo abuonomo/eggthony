@@ -224,9 +224,11 @@ export function drawPlayer() {
   const { player, particles } = S;
   const px = player.x;
   const py = player.y;
+  const boss = S.boss;
+  const inWillBeam = !!(boss && boss.isWill && boss.state === 'will_beam_fire' && boss.willBeamPlayerCaught);
 
   // Iframes flicker (not during metal, muscle, or wings mode)
-  if (player.metalTimer <= 0 && player.muscleTimer <= 0 && player.wingsTimer <= 0 && player.spiderDropTimer <= 0 && player.iframes > 0 && Math.floor(player.iframes * 15) % 2 === 0) return;
+  if (!inWillBeam && player.metalTimer <= 0 && player.muscleTimer <= 0 && player.wingsTimer <= 0 && player.spiderDropTimer <= 0 && player.iframes > 0 && Math.floor(player.iframes * 15) % 2 === 0) return;
   const isMetal = player.metalTimer > 0;
   const isMuscle = player.muscleTimer > 0;
   const isFlying = player.wingsTimer > 0;

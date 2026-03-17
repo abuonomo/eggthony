@@ -120,6 +120,7 @@ export let dwyerSprite = null, dwyerSpriteLoaded = false;
 export let chestplateSprite = null, chestplateSpriteLoaded = false;
 export let swordSprite = null, swordSpriteLoaded = false;
 export let quentinPizzaSprite = null, quentinPizzaSpriteLoaded = false;
+export let willBossSprite = null, willBossSpriteLoaded = false;
 export let snotCageSprite = null, snotCageSpriteLoaded = false;
 export let spiderSprite = null, spiderSpriteLoaded = false;
 export let beerCanSprite = null, beerCanSpriteLoaded = false;
@@ -134,6 +135,7 @@ const spriteFiles = [
   ['data/chesplate.png',       (s) => { chestplateSprite = s; chestplateSpriteLoaded = true; }],
   ['data/sword.png',           (s) => { swordSprite = s; swordSpriteLoaded = true; }],
   ['data/quentin_pizza.png',   (s) => { quentinPizzaSprite = s; quentinPizzaSpriteLoaded = true; }],
+  ['data/will/will_turtle.png',(s) => { willBossSprite = s; willBossSpriteLoaded = true; }],
   ['data/snot_cage.png',       (s) => { snotCageSprite = s; snotCageSpriteLoaded = true; }],
   ['data/spider.png',          (s) => { spiderSprite = s; spiderSpriteLoaded = true; }],
   ['data/beer_can.png',        (s) => { beerCanSprite = s; beerCanSpriteLoaded = true; }],
@@ -156,6 +158,144 @@ export let chrisSprite = null, chrisSpriteLoaded = false;
 export let chrisDrinkingSprite = null, chrisDrinkingSpriteLoaded = false;
 export let crushedCanSprite = null, crushedCanSpriteLoaded = false;
 export let deanBossSprite = null, deanBossSpriteLoaded = false;
+export let willFishSprites = [];
+export let willFishSpritesLoaded = false;
+
+// Procedurally generate colorful fish on offscreen canvases
+function generateFishCanvas(bodyColor, bellyColor, finColor, tailColor, eyeColor, stripeColors, size) {
+  const w = size;
+  const h = Math.round(size * 0.6);
+  const c = document.createElement('canvas');
+  c.width = w;
+  c.height = h;
+  // Expose dimensions so beam drawing can read them like Image.naturalWidth/naturalHeight
+  c.naturalWidth = w;
+  c.naturalHeight = h;
+  const cx = c.getContext('2d');
+  const midX = w * 0.48;
+  const midY = h * 0.5;
+  const bodyW = w * 0.35;
+  const bodyH = h * 0.38;
+
+  // Tail
+  cx.fillStyle = tailColor;
+  cx.beginPath();
+  cx.moveTo(w * 0.12, midY);
+  cx.lineTo(w * 0.01, h * 0.12);
+  cx.lineTo(w * 0.24, midY * 0.78);
+  cx.closePath();
+  cx.fill();
+  cx.beginPath();
+  cx.moveTo(w * 0.12, midY);
+  cx.lineTo(w * 0.01, h * 0.88);
+  cx.lineTo(w * 0.24, midY * 1.22);
+  cx.closePath();
+  cx.fill();
+  // Tail outline
+  cx.strokeStyle = '#3a3a3a';
+  cx.lineWidth = Math.max(1.5, size * 0.03);
+  cx.beginPath();
+  cx.moveTo(w * 0.24, midY * 0.78);
+  cx.lineTo(w * 0.01, h * 0.12);
+  cx.lineTo(w * 0.12, midY);
+  cx.lineTo(w * 0.01, h * 0.88);
+  cx.lineTo(w * 0.24, midY * 1.22);
+  cx.stroke();
+
+  // Body
+  cx.fillStyle = bodyColor;
+  cx.beginPath();
+  cx.ellipse(midX, midY, bodyW, bodyH, 0, 0, Math.PI * 2);
+  cx.fill();
+
+  // Belly
+  cx.fillStyle = bellyColor;
+  cx.beginPath();
+  cx.ellipse(midX + bodyW * 0.08, midY + bodyH * 0.3, bodyW * 0.7, bodyH * 0.4, 0, 0, Math.PI * 2);
+  cx.fill();
+
+  // Color stripes
+  const stripeW = bodyW * 0.12;
+  for (let i = 0; i < stripeColors.length; i++) {
+    cx.fillStyle = stripeColors[i];
+    const sx = midX - bodyW * 0.3 + i * (bodyW * 0.28);
+    cx.beginPath();
+    cx.ellipse(sx, midY, stripeW, bodyH * 0.75, 0, 0, Math.PI * 2);
+    cx.fill();
+  }
+
+  // Dorsal fin
+  cx.fillStyle = finColor;
+  cx.beginPath();
+  cx.moveTo(midX - bodyW * 0.15, midY - bodyH * 0.7);
+  cx.quadraticCurveTo(midX + bodyW * 0.1, midY - bodyH * 1.25, midX + bodyW * 0.5, midY - bodyH * 0.5);
+  cx.lineTo(midX - bodyW * 0.15, midY - bodyH * 0.3);
+  cx.closePath();
+  cx.fill();
+  cx.strokeStyle = '#3a3a3a';
+  cx.lineWidth = Math.max(1.2, size * 0.025);
+  cx.stroke();
+
+  // Bottom fin
+  cx.fillStyle = finColor;
+  cx.beginPath();
+  cx.moveTo(midX, midY + bodyH * 0.6);
+  cx.quadraticCurveTo(midX + bodyW * 0.1, midY + bodyH * 1.1, midX + bodyW * 0.35, midY + bodyH * 0.6);
+  cx.closePath();
+  cx.fill();
+  cx.stroke();
+
+  // Body outline
+  cx.strokeStyle = '#3a3a3a';
+  cx.lineWidth = Math.max(1.5, size * 0.035);
+  cx.beginPath();
+  cx.ellipse(midX, midY, bodyW, bodyH, 0, 0, Math.PI * 2);
+  cx.stroke();
+
+  // Mouth
+  cx.strokeStyle = '#3a3a3a';
+  cx.lineWidth = Math.max(1.2, size * 0.025);
+  cx.beginPath();
+  cx.moveTo(midX + bodyW * 0.85, midY + bodyH * 0.05);
+  cx.lineTo(midX + bodyW * 0.98, midY + bodyH * 0.2);
+  cx.stroke();
+
+  // Eye
+  cx.fillStyle = '#e8e4e0';
+  cx.beginPath();
+  cx.arc(midX + bodyW * 0.55, midY - bodyH * 0.15, bodyH * 0.22, 0, Math.PI * 2);
+  cx.fill();
+  cx.strokeStyle = '#3a3a3a';
+  cx.lineWidth = Math.max(1, size * 0.02);
+  cx.stroke();
+  cx.fillStyle = eyeColor;
+  cx.beginPath();
+  cx.arc(midX + bodyW * 0.58, midY - bodyH * 0.15, bodyH * 0.12, 0, Math.PI * 2);
+  cx.fill();
+  cx.fillStyle = '#2a2a2a';
+  cx.beginPath();
+  cx.arc(midX + bodyW * 0.6, midY - bodyH * 0.15, bodyH * 0.07, 0, Math.PI * 2);
+  cx.fill();
+
+  return c;
+}
+
+// Generate a variety of colorful fish
+const FISH_DEFS = [
+  { body: '#6a8caa', belly: '#9ab5c8', fin: '#a05a5a', tail: '#a05a5a', eye: '#2c3e50', stripes: ['#b89060', '#a05a5a'] },
+  { body: '#a07850', belly: '#c8b898', fin: '#8a4a3a', tail: '#906840', eye: '#1a1a2e', stripes: ['#c8c0a8', '#b09858'] },
+  { body: '#5a8a60', belly: '#98b89a', fin: '#b09850', tail: '#a08848', eye: '#2c3e50', stripes: ['#6a9a6a', '#5a8a7a'] },
+  { body: '#7a5a8a', belly: '#b098b8', fin: '#a05878', tail: '#7a5a8a', eye: '#1a1a2e', stripes: ['#b888a8', '#6a7a9a'] },
+  { body: '#a06060', belly: '#c8a098', fin: '#b08850', tail: '#8a4a4a', eye: '#2c3e50', stripes: ['#b890a0', '#c0a868'] },
+  { body: '#b0a050', belly: '#d0c8a8', fin: '#a07840', tail: '#b09848', eye: '#1a1a2e', stripes: ['#a07070', '#7098a0'] },
+  { body: '#508a7a', belly: '#90b8a8', fin: '#a06060', tail: '#4a7a6a', eye: '#2c3e50', stripes: ['#78b0a0', '#7898a8'] },
+  { body: '#a05070', belly: '#c898a8', fin: '#b08848', tail: '#8a4060', eye: '#1a1a2e', stripes: ['#c0a868', '#9878a0'] },
+];
+const FISH_SIZE = 64;
+willFishSprites = FISH_DEFS.map(d =>
+  generateFishCanvas(d.body, d.belly, d.fin, d.tail, d.eye, d.stripes, FISH_SIZE)
+);
+willFishSpritesLoaded = willFishSprites.length > 0;
 
 // Auto-crop to non-transparent bounding box (no color stripping)
 function autoCrop(img, callback) {
@@ -203,6 +343,8 @@ for (const [src, cb] of preCroppedFiles) {
   raw.onload = () => autoCrop(raw, cb);
   raw.src = src;
 }
+
+// Fish sprites are now procedurally generated above (no PNG loading needed)
 
 export let wingsPowerupSprite = null, wingsPowerupSpriteLoaded = false;
 {
