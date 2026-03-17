@@ -27,6 +27,7 @@ import { loadGear, loadGearSprites, setPlayerSprite,
          drawEquipScreen, handleEquipScreenClick, drawGearDrop, GEAR_ITEMS } from './gear.js';
 import { eggSprite, spriteLoaded } from './sprites.js';
 import { update, setShowNameInput } from './simulation.js';
+import { initAIBridge, aiBeforeUpdate, aiDrawOverlay } from './ai-bridge.js';
 
 // ============================================================
 // CANVAS SETUP
@@ -83,6 +84,9 @@ eggSprite.addEventListener('load', () => setPlayerSprite(eggSprite, true));
 
 // Wire up showNameInput for simulation
 setShowNameInput(showNameInput);
+
+// AI bridge (activated with ?ai URL param)
+initAIBridge();
 
 // ============================================================
 // CLICK HANDLER (state transitions)
@@ -194,6 +198,7 @@ function gameLoop(now) {
   S.accumulator += dt;
 
   while (S.accumulator >= TICK_RATE) {
+    aiBeforeUpdate();
     update(TICK_RATE);
     S.accumulator -= TICK_RATE;
   }
@@ -274,6 +279,7 @@ function draw() {
   }
 
   ctx.restore();
+  aiDrawOverlay();
 }
 
 // Start the loop

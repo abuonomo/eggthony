@@ -20,3 +20,7 @@ node_modules/
 
 # Claude Code
 .claude/
+
+# RL training artifacts
+rl/tb_logs/
+rl/models/

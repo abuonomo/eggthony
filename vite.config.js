@@ -18,5 +18,14 @@ export default defineConfig({
     fs: {
       allow: ['.'],
     },
+    allowedHosts: true,
+    // Proxy WebSocket for AI bridge so ngrok only needs one tunnel
+    proxy: {
+      '/ai-ws': {
+        target: 'ws://localhost:8765',
+        ws: true,
+        rewriteWsOrigin: true,
+      },
+    },
   },
 });
