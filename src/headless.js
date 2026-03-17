@@ -6,10 +6,11 @@ import './node-shims.js';
 
 import { S, resetGameState } from './state.js';
 import { seedRng } from './rng.js';
-import { TICK_RATE, W, H, PLAYER_W, PLAYER_H, PLAYER_MAX_HP } from './constants.js';
+import { TICK_RATE, W, H, PLAYER_W, PLAYER_H, PLAYER_MAX_HP, SNOT_COOLDOWN, SNOT_MAX_CHARGE, PLATFORM_Y } from './constants.js';
 import { initAmbientParticles, initBgDetails } from './world.js';
 import { startRound } from './waves.js';
 import { step, stepN } from './simulation.js';
+import { fireSnotRocket } from './weapons.js';
 
 function getObs() {
   const { player } = S;
@@ -32,7 +33,7 @@ function getObs() {
     },
     enemies: S.enemies.map(e => ({
       x: e.x, y: e.y, vx: e.vx, vy: e.vy,
-      hp: e.hp, type: e.type, frozen: e.frozenTimer > 0,
+      hp: e.hp, type: e.type, frozen: e.freezeTimer > 0,
     })),
     boss: S.boss ? {
       x: S.boss.x, y: S.boss.y,
@@ -52,6 +53,11 @@ function getObs() {
       chestplate: S.chestplateItem ? { x: S.chestplateItem.x, y: S.chestplateItem.y } : null,
     },
     fartClouds: S.fartClouds.map(c => ({ x: c.x, y: c.y, radius: c.radius })),
+    campSpider: {
+      campTimer: S.campTimer || 0,
+      state: S.campSpider ? S.campSpider.state : 'none',
+      zapHits: S.campSpider ? S.campSpider.zapHits : 0,
+    },
     floatingPlatforms: S.floatingPlatforms.map(p => ({ x: p.x, y: p.y, w: p.w, phase: p.phase })),
     score: S.score,
     round: S.round,
@@ -63,11 +69,12 @@ function getObs() {
 export function createEnv(opts = {}) {
   const seed = opts.seed ?? 42;
 
-  function reset() {
-    seedRng(seed);
+  function reset(resetOpts = {}) {
+    const startRnd = resetOpts.startRound ?? 1;
+    seedRng(resetOpts.seed ?? seed);
     S.headless = true;
     S.gameState = 'playing';
-    S.currentThemeIndex = 0;
+    S.currentThemeIndex = startRnd >= 7 ? 2 : startRnd >= 4 ? 1 : 0;
     // Reset state not covered by resetGameState
     S.gear = { version: 1, inventory: [], equipped: { head: null, body: null, collar: null, accessory: null }, totalBuffs: { maxHp: 0, speed: 0, jumpForce: 0, damage: 0, dropLuck: 0 } };
     S.gearDropItem = null;
@@ -82,10 +89,10 @@ export function createEnv(opts = {}) {
     S.devTapTimer = 0; S.devTapCount = 0;
     S.keys = {};
     S.mouse = { x: W / 2, y: H / 2, left: false, right: false };
-    resetGameState(1);
+    resetGameState(startRnd);
     initAmbientParticles();
     initBgDetails();
-    startRound(1);
+    startRound(startRnd);
     return getObs();
   }
 
@@ -98,10 +105,18 @@ export function createEnv(opts = {}) {
     if (action.jump) S.keys[' '] = true;
     if (action.down) S.keys['s'] = true;
     if (action.shoot) S.mouse.left = true;
-    if (action.snot) S.mouse.right = true;
     if (action.aimX !== undefined) S.mouse.x = action.aimX;
     if (action.aimY !== undefined) S.mouse.y = action.aimY;
+
+    // Snot rocket: instant max-charge fire when action.snot is true
+    if (action.snot && S.player.snotCooldown <= 0 && !S.snotRocket) {
+      fireSnotRocket(1.0);
+      S.player.snotCooldown = SNOT_COOLDOWN;
+    }
   }
+
+  let prevMetal = 0, prevMuscle = 0, prevWings = 0, prevSpiderDrop = 0;
+  let prevFrozenCount = 0;
 
   function envStep(action) {
     const prevScore = S.score;
@@ -112,13 +127,44 @@ export function createEnv(opts = {}) {
     step();
 
     const done = S.player.hp <= 0 || S.gameState === 'gameOver' || S.gameState === 'gearDrop';
+    const kills = S.score - prevScore; // score gained = kills happened
 
-    // Reward: score delta + survival bonus - hp loss penalty
-    let reward = (S.score - prevScore);
-    reward += 0.01; // small survival bonus per tick
-    if (S.player.hp < prevHp) reward -= (prevHp - S.player.hp) * 0.1;
-    if (S.round > prevRound) reward += 50; // round completion bonus
-    if (done) reward -= 10; // death penalty
+    // Reward: survival is king — avoid damage, stay alive, clear rounds
+    let reward = 0;
+    reward += kills * 0.01;             // kills matter but aren't the priority
+    reward += 0.1;                      // survival bonus per tick
+    if (S.player.hp < prevHp) reward -= (prevHp - S.player.hp) * 2; // taking 10 dmg = -20
+    if (S.round > prevRound) reward += 100; // round completion is the real goal
+    if (done) reward -= 200;                // death is catastrophic
+
+    // Spider Drop reward — agent discovered the clutch escape
+    if (S.player.spiderDropTimer > prevSpiderDrop && prevSpiderDrop <= 0) reward += 30;
+
+    // Powerup pickups — reward grabbing items
+    if (S.player.metalTimer > prevMetal && prevMetal <= 0) reward += 20;
+    if (S.player.muscleTimer > prevMuscle && prevMuscle <= 0) reward += 20;
+    if (S.player.wingsTimer > prevWings && prevWings <= 0) reward += 20;
+    if (S.player.hp > prevHp) reward += 10; // healed (chestplate)
+
+    // State-based rewards: reward OUTCOMES of good play, not specific actions
+    // Kills during powerup buffs — discover aggressive play when buffed
+    if (kills > 0 && S.player.metalTimer > 0) reward += kills * 0.05;
+    if (kills > 0 && S.player.muscleTimer > 0) reward += kills * 0.05;
+    if (kills > 0 && S.player.spiderDropTimer > 0) reward += kills * 0.05;
+
+    // Multiple enemies frozen at once — discover snot grouping
+    const frozenCount = S.enemies.filter(e => e.freezeTimer > 0 && !e.dying).length;
+    if (frozenCount >= 2 && prevFrozenCount < 2) reward += 15;
+
+    // Being on a floating platform when enemies exist — discover high ground
+    const onFloatPlat = S.player.onGround && (S.player.y + PLAYER_H) < PLATFORM_Y - 10;
+    if (onFloatPlat && S.enemies.length > 3) reward += 0.3;
+
+    prevMetal = S.player.metalTimer;
+    prevMuscle = S.player.muscleTimer;
+    prevWings = S.player.wingsTimer;
+    prevSpiderDrop = S.player.spiderDropTimer;
+    prevFrozenCount = frozenCount;
 
     const obs = getObs();
     const info = {

@@ -9,3 +9,14 @@ dependencies = [
     "pillow>=11.3.0",
     "python-dotenv>=1.1.0",
 ]
+
+[project.optional-dependencies]
+rl = [
+    "gymnasium>=1.0.0",
+    "stable-baselines3>=2.4.0",
+    "numpy>=1.24.0",
+    "tensorboard>=2.15.0",
+    "websockets>=13.0",
+    "setuptools>=82.0.0",
+    "mini-racer>=0.12.4",
+]
