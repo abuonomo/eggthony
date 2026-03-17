@@ -333,7 +333,7 @@ export function updateEnemyProjectiles(dt) {
     p.y += p.vy * dt;
     p.life -= dt;
 
-    if (p.life <= 0 || p.x < -20 || p.x > W + 20 || p.y < -20 || p.y > H + 20) {
+    if (p.life <= 0 || p.x < -100 || p.x > W + 100 || p.y < -100 || p.y > H + 100) {
       enemyProjectiles.splice(i, 1);
       continue;
     }
@@ -341,17 +341,28 @@ export function updateEnemyProjectiles(dt) {
     // Hit player
     if (player.iframes <= 0) {
       const dist = Math.hypot(p.x - (player.x + PLAYER_W / 2), p.y - (player.y + PLAYER_H / 2));
-      if (dist < 24) {
+      const hitRadius = p.radius || 24;
+      if (dist < hitRadius) {
         if (player.metalTimer > 0) {
           // Deflect projectile
           spawnParticles(p.x, p.y, '#aaccff', 5, 80, 0.2);
           playSound('hit');
+          if (p.isSonicBoom) {
+             player.vx = Math.sign(p.vx) * 200; // Small knockback even in metal
+          }
         } else {
           player.hp -= p.damage;
           player.iframes = IFRAME_DURATION;
           player.flashTimer = 0.15;
-          spawnDamageNumber(player.x + PLAYER_W / 2, player.y, p.damage, '#ff44ff');
-          spawnParticles(p.x, p.y, '#ff44ff', 8, 80, 0.3);
+          if (p.isSonicBoom) {
+            player.vx = p.knockbackX || (Math.sign(p.vx) * 600);
+            player.vy = p.knockbackY || -400;
+            player.knockbackTimer = 0.5;
+            player.airJumps = 1;
+            addShake(15, 0.4);
+          }
+          spawnDamageNumber(player.x + PLAYER_W / 2, player.y, p.damage, p.color || '#ff44ff');
+          spawnParticles(p.x, p.y, p.color || '#ff44ff', 8, 80, 0.3);
           addShake(4, 0.1);
           playSound('hurt');
           if (random() < 0.3) playVoice('bad');
@@ -551,14 +562,36 @@ export function drawEnemies() {
         ctx.fill();
       }
     }
-    // Main projectile
-    ctx.fillStyle = p.color;
-    ctx.shadowColor = p.color;
-    ctx.shadowBlur = 12;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, 8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.shadowBlur = 0;
+    if (p.isSonicBoom) {
+      ctx.fillStyle = `rgba(0, 255, 255, 0.6)`;
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = 20;
+      ctx.beginPath();
+      // Taller, thinner crescent for a faster "sonic" look
+      ctx.ellipse(p.x, p.y, p.radius / 4, p.radius, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Add a second, outer ring for more impact
+      ctx.strokeStyle = `rgba(255, 255, 255, 0.4)`;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(p.x - Math.sign(p.vx) * 10, p.y, p.radius / 3, p.radius * 1.1, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y, p.radius / 8, p.radius * 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    } else {
+      ctx.fillStyle = p.color;
+      ctx.shadowColor = p.color;
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.radius || 8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
   }
 }
 

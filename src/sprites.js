@@ -155,6 +155,7 @@ export let wingsSpriteLoaded = false;
 export let chrisSprite = null, chrisSpriteLoaded = false;
 export let chrisDrinkingSprite = null, chrisDrinkingSpriteLoaded = false;
 export let crushedCanSprite = null, crushedCanSpriteLoaded = false;
+export let deanBossSprite = null, deanBossSpriteLoaded = false;
 
 // Auto-crop to non-transparent bounding box (no color stripping)
 function autoCrop(img, callback) {
@@ -195,6 +196,7 @@ const preCroppedFiles = [
   ['data/eager_chris_holding_can.png', (s) => { chrisSprite = s; chrisSpriteLoaded = true; }],
   ['data/eager_chris_drinking.png',    (s) => { chrisDrinkingSprite = s; chrisDrinkingSpriteLoaded = true; }],
   ['data/beer_can_crushed.png',        (s) => { crushedCanSprite = s; crushedCanSpriteLoaded = true; }],
+  ['data/dean_boss.png',               (s) => { deanBossSprite = s; deanBossSpriteLoaded = true; }],
 ];
 for (const [src, cb] of preCroppedFiles) {
   const raw = new Image();

@@ -11,7 +11,7 @@ export function ensureAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
   if (!audioUnlocked) {
     audioUnlocked = true;
-    for (const clip of [...Object.values(voiceClips), snotSniffleClip, snotLaunchClip, quentinFartClip, dwyerClip, gulpClip, throwClip]) {
+    for (const clip of [...Object.values(voiceClips), snotSniffleClip, snotLaunchClip, quentinFartClip, dwyerClip, deanJamClip, gulpClip, throwClip, melodicaClip]) {
       clip.load();
     }
   }
@@ -267,10 +267,14 @@ export const quentinFartClip = new Audio(encodeURI('data/sounds/quentin_fart_tri
 quentinFartClip.preload = 'auto';
 export const dwyerClip = new Audio(encodeURI('data/sounds/dwyer.m4a'));
 dwyerClip.preload = 'auto';
+export const deanJamClip = new Audio(encodeURI('data/sounds/dean/dean_jam.m4a'));
+deanJamClip.preload = 'auto';
 export const gulpClip = new Audio('data/sounds/freesound_community-gulp-37759.mp3');
 gulpClip.preload = 'auto';
 export const throwClip = new Audio('data/sounds/denielcz-bamboo-whoosh-429156.mp3');
 throwClip.preload = 'auto';
+export const melodicaClip = new Audio('data/sounds/freesound_community-melodica-one-note-88607.mp3');
+melodicaClip.preload = 'auto';
 export const musicClip = new Audio(encodeURI('data/sounds/music.m4a'));
 musicClip.preload = 'auto';
 musicClip.loop = true;
