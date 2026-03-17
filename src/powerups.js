@@ -10,6 +10,8 @@ import {
   CHRIS_THROW_RANGE, CHRIS_THROW_DAMAGE, CHRIS_THROW_COOLDOWN,
   CHRIS_CHUG_TIME, CHRIS_SPLASH_RADIUS, CHRIS_SPLASH_DAMAGE,
   CHRIS_CAN_SPEED, CHRIS_CAN_GRAVITY, CHRIS_ENTRY_SPEED, CHRIS_CHARGE_DAMAGE,
+  HEART_SIZE, HEART_HEAL, HEART_SPEED, HEART_Y_MIN, HEART_Y_MAX,
+  PLAYER_MAX_HP,
 } from './constants.js';
 import { random } from './rng.js';
 import { playSound, playNoise, playVoice, playClip, dwyerClip } from './audio.js';
@@ -1241,6 +1243,95 @@ export function drawChris() {
     ctx.restore();
   }
 
+  ctx.restore();
+}
+
+// ============================================================
+// HEALTH HEART PICKUP
+// ============================================================
+export function updateHeart(dt) {
+  const { player, enemies, boss } = S;
+
+  if (!S.heartItem) {
+    S.heartSpawnTimer -= dt;
+    if (S.heartSpawnTimer <= 0 && player.hp < PLAYER_MAX_HP && (enemies.length > 0 || (boss && !boss.dying))) {
+      const luck = S.gear.totalBuffs ? S.gear.totalBuffs.dropLuck : 0;
+      S.heartSpawnTimer = (25 + random() * 15) * (1 - luck);
+      // Spawn from left or right edge, floating near top of screen
+      const fromLeft = random() < 0.5;
+      S.heartItem = {
+        x: fromLeft ? -HEART_SIZE : W + HEART_SIZE,
+        y: HEART_Y_MIN + random() * (HEART_Y_MAX - HEART_Y_MIN),
+        dir: fromLeft ? 1 : -1,
+        bobTimer: random() * Math.PI * 2,
+      };
+    }
+    return;
+  }
+
+  const h = S.heartItem;
+  h.x += h.dir * HEART_SPEED * dt;
+  h.bobTimer += dt * 5;
+
+  // Off screen — missed it
+  if ((h.dir > 0 && h.x > W + HEART_SIZE) || (h.dir < 0 && h.x < -HEART_SIZE)) {
+    S.heartItem = null;
+    return;
+  }
+
+  // Pickup collision
+  const bobY = h.y + Math.sin(h.bobTimer) * 6;
+  if (rectsOverlap(player.x, player.y, PLAYER_W, PLAYER_H, h.x - HEART_SIZE / 2, bobY - HEART_SIZE / 2, HEART_SIZE, HEART_SIZE)) {
+    const heal = Math.min(HEART_HEAL, PLAYER_MAX_HP - player.hp);
+    player.hp += heal;
+    spawnDamageNumber(player.x + PLAYER_W / 2, player.y, '+' + heal, '#44ff44');
+    spawnParticles(h.x, bobY, '#ff4466', 12, 100, 0.4);
+    spawnParticles(h.x, bobY, '#ff88aa', 6, 60, 0.3);
+    addShake(3, 0.08);
+    playSound('powerup');
+    S.heartItem = null;
+  }
+}
+
+export function drawHeart() {
+  if (!S.heartItem) return;
+  const ctx = S.ctx;
+  const h = S.heartItem;
+  const bobY = h.y + Math.sin(h.bobTimer) * 6;
+  const x = h.x;
+  const y = bobY;
+  const sz = HEART_SIZE;
+
+  ctx.save();
+
+  // Glow
+  ctx.shadowColor = '#ff4466';
+  ctx.shadowBlur = 12;
+
+  // Draw heart shape
+  const topY = y - sz * 0.3;
+  const pulse = 1 + Math.sin(h.bobTimer * 2) * 0.08;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.scale(pulse, pulse);
+  ctx.translate(-x, -y);
+
+  ctx.fillStyle = '#ff2244';
+  ctx.beginPath();
+  ctx.moveTo(x, y + sz * 0.25);
+  // Left bump
+  ctx.bezierCurveTo(x - sz * 0.5, y - sz * 0.25, x - sz * 0.5, topY, x, topY + sz * 0.15);
+  // Right bump
+  ctx.bezierCurveTo(x + sz * 0.5, topY, x + sz * 0.5, y - sz * 0.25, x, y + sz * 0.25);
+  ctx.fill();
+
+  // Shine highlight
+  ctx.fillStyle = 'rgba(255,255,255,0.35)';
+  ctx.beginPath();
+  ctx.arc(x - sz * 0.15, topY + sz * 0.2, sz * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
   ctx.restore();
 }
 

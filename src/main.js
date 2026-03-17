@@ -15,7 +15,8 @@ import { drawEnemies } from './enemies.js';
 import { drawLightningBolts, drawSnotRocket, drawSnotCharging,
          drawPoopBombs, drawSnotStormOverlay } from './weapons.js';
 import { drawMetalHat, drawSmoothie, drawWings, drawChestplate,
-         drawDwyer, drawBeerCan, drawChris, drawChrisCans } from './powerups.js';
+         drawDwyer, drawBeerCan, drawChris, drawChrisCans,
+         drawHeart } from './powerups.js';
 import { initAmbientParticles, initBgDetails,
          drawBackground, drawPlatform, drawFloatingPlatforms } from './world.js';
 import { startRound } from './waves.js';
@@ -230,6 +231,7 @@ function draw() {
     drawDwyer();
     drawChris();
     drawBeerCan();
+    drawHeart();
     drawBoss();
     drawFartClouds();
     drawPlayer();

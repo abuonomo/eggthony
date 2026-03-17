@@ -17,7 +17,8 @@ import { updateEnemies } from './enemies.js';
 import { updateLightningBolts, updateSnotRocket, updatePoopBombs } from './weapons.js';
 import { updateMetalHat, updateSmoothie, updateWings,
          updateChestplate, updateDwyer,
-         updateBeerCan, updateChris, updateChrisCans } from './powerups.js';
+         updateBeerCan, updateChris, updateChrisCans,
+         updateHeart } from './powerups.js';
 import { getThemeIndex, initAmbientParticles, initBgDetails,
          updateAmbientParticles, updateFloatingPlatforms } from './world.js';
 import { startRound, updateWaves } from './waves.js';
@@ -113,6 +114,7 @@ export function update(dt) {
     updateBeerCan(dt);
     updateChris(dt);
     updateChrisCans(dt);
+    updateHeart(dt);
     updateCampSpider(dt);
     updateWaves(dt);
     updateFloatingPlatforms(dt);
