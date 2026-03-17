@@ -1,6 +1,6 @@
 import { S } from './state.js';
 import { SNOT_STORM_DURATION, MAX_ALIVE_ENEMIES_BASE, MAX_ALIVE_ENEMIES_CAP } from './constants.js';
-import { playSound, playVoice } from './audio.js';
+import { playSound, playVoice, playWillVoice } from './audio.js';
 import { createBoss, isBossRound } from './boss.js';
 import { spawnEnemyForRound } from './enemies.js';
 
@@ -19,7 +19,9 @@ export function startRound(r) {
     S.bossEntering = true;
     S.bossDefeated = false;
     playSound('bossRoar');
-    if (S.boss.appearance === 1) {
+    if (r === 12) {
+      playWillVoice(true);
+    } else if (S.boss.appearance === 1) {
       playVoice('boss', true);
     }
   } else {

@@ -119,6 +119,12 @@ export function update(dt) {
     updateWaves(dt);
     updateFloatingPlatforms(dt);
 
+    if (S.devInvulnerable) {
+      const maxHp = PLAYER_MAX_HP + (S.gear.totalBuffs ? S.gear.totalBuffs.maxHp : 0);
+      if (S.player.hp < maxHp) S.player.hp = maxHp;
+      S.player.iframes = Math.max(S.player.iframes, 0.1);
+    }
+
     // Check death
     if (S.player.hp <= 0) {
       if (audioCtx) musicClip.pause();

@@ -11,7 +11,7 @@ export function ensureAudio() {
   if (audioCtx.state === 'suspended') audioCtx.resume();
   if (!audioUnlocked) {
     audioUnlocked = true;
-    for (const clip of [...Object.values(voiceClips), snotSniffleClip, snotLaunchClip, quentinFartClip, dwyerClip, deanJamClip, gulpClip, throwClip, melodicaClip]) {
+    for (const clip of [...Object.values(voiceClips), ...willVoiceClips, snotSniffleClip, snotLaunchClip, quentinFartClip, dwyerClip, deanJamClip, melodicaClip, stampClip, gargleClip, gulpClip, throwClip]) {
       clip.load();
     }
   }
@@ -269,6 +269,18 @@ export const dwyerClip = new Audio(encodeURI('data/sounds/dwyer.m4a'));
 dwyerClip.preload = 'auto';
 export const deanJamClip = new Audio(encodeURI('data/sounds/dean/dean_jam.m4a'));
 deanJamClip.preload = 'auto';
+export const stampClip = new Audio('data/sounds/freesound_community-traditional-stamp-44189.mp3');
+stampClip.preload = 'auto';
+export const gargleClip = new Audio('data/sounds/beetpro-gargle-sound-effect-27-11506.mp3');
+gargleClip.preload = 'auto';
+gargleClip.loop = true;
+export const willVoiceClips = [
+  new Audio('data/sounds/will/will_1.m4a'),
+  new Audio('data/sounds/will/will_2.m4a'),
+  new Audio('data/sounds/will/will_3.m4a'),
+  new Audio('data/sounds/will/will_4.m4a')
+];
+for (const clip of willVoiceClips) clip.preload = 'auto';
 export const gulpClip = new Audio('data/sounds/freesound_community-gulp-37759.mp3');
 gulpClip.preload = 'auto';
 export const throwClip = new Audio('data/sounds/denielcz-bamboo-whoosh-429156.mp3');
@@ -328,4 +340,19 @@ export function playClip(clip) {
   if (!audioCtx) return;
   clip.currentTime = 0;
   clip.play().catch(() => {});
+}
+
+export function playWillVoice(force = false) {
+  if (!audioCtx) return;
+  if (!force && isVoicePlaying()) return;
+  if (activeVoice) {
+    activeVoice.pause();
+    activeVoice.currentTime = 0;
+  }
+  const idx = Math.floor(random() * willVoiceClips.length);
+  const clip = willVoiceClips[idx];
+  if (!clip) return;
+  clip.currentTime = 0;
+  clip.play().catch(() => {});
+  activeVoice = clip;
 }
