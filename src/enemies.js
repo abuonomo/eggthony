@@ -563,15 +563,24 @@ export function drawEnemies() {
       }
     }
     if (p.isSonicBoom) {
-      ctx.fillStyle = `rgba(0, 255, 255, 0.8)`;
+      ctx.fillStyle = `rgba(0, 255, 255, 0.6)`;
       ctx.shadowColor = '#00ffff';
-      ctx.shadowBlur = 15;
+      ctx.shadowBlur = 20;
       ctx.beginPath();
-      ctx.ellipse(p.x, p.y, p.radius / 2, p.radius, 0, 0, Math.PI * 2);
+      // Taller, thinner crescent for a faster "sonic" look
+      ctx.ellipse(p.x, p.y, p.radius / 4, p.radius, 0, 0, Math.PI * 2);
       ctx.fill();
+      
+      // Add a second, outer ring for more impact
+      ctx.strokeStyle = `rgba(255, 255, 255, 0.4)`;
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(p.x - Math.sign(p.vx) * 10, p.y, p.radius / 3, p.radius * 1.1, 0, 0, Math.PI * 2);
+      ctx.stroke();
+
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.ellipse(p.x, p.y, p.radius / 4, p.radius * 0.8, 0, 0, Math.PI * 2);
+      ctx.ellipse(p.x, p.y, p.radius / 8, p.radius * 0.8, 0, 0, Math.PI * 2);
       ctx.fill();
       ctx.shadowBlur = 0;
     } else {

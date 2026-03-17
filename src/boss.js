@@ -6,7 +6,7 @@ import {
   SNOT_STORM_DURATION,
 } from './constants.js';
 import { random } from './rng.js';
-import { playSound, playNoise, playVoice, playClip, quentinFartClip, melodicaClip, deanJamClip } from './audio.js';
+import { playSound, playNoise, playVoice, playClip, quentinFartClip, deanJamClip, melodicaClip } from './audio.js';
 import {
   evilSprite, evilSpriteLoaded, evilSprite2, evilSprite2Loaded,
   quentinPizzaSprite, quentinPizzaSpriteLoaded,
@@ -35,7 +35,7 @@ export function createBoss(r) {
   const isDean = app === 2; // Level 6
   // QP resets scale: qpApp counts from 1 on first QP appearance
   const qpApp = isQP ? app - 2 : app;
-  const scale = isQP ? 1 + (qpApp - 1) * 0.15 : (isDean ? 1.0 : 1 + (app - 1) * 0.2); // Reduced from 1.5 to 1.0
+  const scale = isQP ? 1 + (qpApp - 1) * 0.15 : (isDean ? 1.0 : 1 + (app - 1) * 0.2); 
   const baseH = isQP ? 153 : (isDean ? 160 : 180);
   const baseW = isQP ? 153 : (isDean ? 100 : Math.round(180 * (818 / 1164))); 
   const w = Math.round(baseW * scale);
@@ -47,8 +47,8 @@ export function createBoss(r) {
     w, h,
     vx: 0,
     vy: 0,
-    hp: isDean ? 800 : 300 + (app - 1) * 200, // Explicitly bump Dean's HP
-    maxHp: isDean ? 800 : 300 + (app - 1) * 200, // Explicitly bump Dean's max HP
+    hp: isDean ? 800 : 300 + (app - 1) * 200, 
+    maxHp: isDean ? 800 : 300 + (app - 1) * 200, 
     damage: damage,
     scoreValue: 1000 + (app - 1) * 500,
     speed: 100 + (app - 1) * 15,
@@ -217,6 +217,11 @@ export function updateBoss(dt) {
       if (boss.x < PLATFORM_X) boss.x = PLATFORM_X;
       if (boss.x + boss.w > PLATFORM_X + PLATFORM_W) boss.x = PLATFORM_X + PLATFORM_W - boss.w;
 
+      // Dean random jam line
+      if (boss.isDean && random() < dt * 0.15) {
+        playClip(deanJamClip);
+      }
+
       // QP fart cooldown decay
       if (boss.isQuentinPizza && boss.fartCooldown > 0) {
         boss.fartCooldown -= dt;
@@ -257,24 +262,24 @@ export function updateBoss(dt) {
       if (boss.chargeTimer <= 0) {
         boss.state = 'sonic_boom_release';
         boss.chargeTimer = 0.5;
-        playClip(melodicaClip);
+        playClip(melodicaClip); // Play the melodica for the sonic impact
         
         // Spawn sonic boom projectile/shockwave
         const dir = boss.facingRight ? 1 : -1;
         S.enemyProjectiles.push({
           x: boss.facingRight ? boss.x + boss.w : boss.x,
           y: boss.y + boss.h / 2,
-          vx: dir * 700, // fast
+          vx: dir * 750, // slightly faster
           vy: 0,
-          damage: 25,
-          life: 2,
+          damage: 30, // slightly more damage
+          life: 2.5,
           color: '#00ffff',
-          radius: 40, // big projectile
+          radius: 120, // much taller
           isSonicBoom: true,
-          knockbackX: dir * 800,
-          knockbackY: -400
+          knockbackX: dir * 2200, // massive knockback
+          knockbackY: -700
         });
-        addShake(10, 0.3);
+        addShake(15, 0.4);
       }
       break;
     }
@@ -516,6 +521,10 @@ export function damageBoss(damage, knockX, knockY) {
     boss.dying = true;
     boss.deathTimer = 1.0;
     boss.vx = 0;
+    if (boss.isDean) {
+      deanJamClip.pause();
+      deanJamClip.currentTime = 0;
+    }
     spawnParticles(boss.x + boss.w / 2, boss.y + boss.h / 2, '#ff4422', 40, 350, 0.8);
     spawnParticles(boss.x + boss.w / 2, boss.y + boss.h / 2, '#ffaa44', 30, 300, 0.7);
     spawnParticles(boss.x + boss.w / 2, boss.y + boss.h / 2, '#ffdd00', 20, 250, 0.6);
