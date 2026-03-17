@@ -45,7 +45,7 @@ export const FLOAT_PLAT_SLOTS = [
 // Lightning
 export const LIGHTNING_SPEED = 700;
 export const LIGHTNING_DAMAGE = 15;
-export const LIGHTNING_COOLDOWN = 0.12;
+export const LIGHTNING_COOLDOWN = 0.18;
 
 // Wings
 export const WINGS_DURATION = 8;
@@ -205,35 +205,35 @@ export const ENEMY_TYPES = {
   grunt: {
     color: '#44cc44',
     eyeColor: '#ff0000',
-    baseHp: 40,
+    baseHp: 65,
     baseW: 56,
     baseH: 64,
-    speed: 80,
-    damage: 10,
+    speed: 95,
+    damage: 14,
     score: 100
   },
   spitter: {
     color: '#cc44cc',
     eyeColor: '#ffff00',
-    baseHp: 30,
+    baseHp: 50,
     baseW: 48,
     baseH: 56,
-    speed: 50,
-    damage: 8,
+    speed: 60,
+    damage: 12,
     score: 150,
-    shootRange: 250,
-    shootCooldown: 2.0,
-    projectileSpeed: 200
+    shootRange: 270,
+    shootCooldown: 1.8,
+    projectileSpeed: 240
   },
   brute: {
     color: '#cc6622',
     eyeColor: '#ff4444',
-    baseHp: 120,
+    baseHp: 180,
     baseW: 72,
     baseH: 74,
-    speed: 120,
-    damage: 25,
+    speed: 130,
+    damage: 30,
     score: 300,
-    chargeSpeed: 300
+    chargeSpeed: 320
   }
 };
